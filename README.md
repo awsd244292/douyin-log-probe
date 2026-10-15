@@ -14,6 +14,7 @@
 | DLPPerfProbe | FPS（CADisplayLink）/ 内存（task_info 15s）/ 主线程卡顿看门狗（observer+独立线程双路） |
 | DLPCrashCatcher | 12 信号 sigaction + 备用栈 + 未捕获异常 + 60s 自愈定时器 |
 | DLPBypassCatcher | 绕过登录专用捕捉器：三开关 key + 官方 isLogin/userID 轮询（变化才记）、present/dismiss 追踪、3s 未 dismiss 告警、开关 ON→OFF 翻转告警（疑似 DYYY 自动禁用） |
+| DLPLogUploader | 日志上传：调系统邮件把日志+classmap.json 发到用户 Gmail（附件），助手用 Gmail 连接器直接读；本机没配邮件帐户时提示改用「复制」 |
 | DLPLogHub | 日志中枢：`ts\|K\|domain\|class\|event\|detail`；NSLog + 内存 2000 行 + 落盘 `Documents/DLPLogs/` 按日轮转（保留 7 天） |
 | DLPSettings | 设置页注入 `AWESettingsViewModel.sectionDataArray` → 「日志探针」分区，开关热切换 |
 

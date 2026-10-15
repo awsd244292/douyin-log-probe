@@ -5,6 +5,7 @@
 
 #import "DLPLogViewController.h"
 #import "DLPLogHub.h"
+#import "DLPLogUploader.h"
 
 @interface DLPLogViewController () <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
 @property(nonatomic, strong) UITableView *tableView;
@@ -24,13 +25,16 @@
     self.navigationItem.leftBarButtonItem =
         [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
                                                      target:self action:@selector(dlp_close)];
+    UIBarButtonItem *uploadItem =
+        [[UIBarButtonItem alloc] initWithTitle:@"上传" style:UIBarButtonItemStylePlain
+                                        target:self action:@selector(dlp_upload)];
     UIBarButtonItem *copyItem =
         [[UIBarButtonItem alloc] initWithTitle:@"复制" style:UIBarButtonItemStylePlain
                                         target:self action:@selector(dlp_copy)];
     UIBarButtonItem *clearItem =
         [[UIBarButtonItem alloc] initWithTitle:@"清空" style:UIBarButtonItemStylePlain
                                         target:self action:@selector(dlp_clear)];
-    self.navigationItem.rightBarButtonItems = @[copyItem, clearItem];
+    self.navigationItem.rightBarButtonItems = @[uploadItem, copyItem, clearItem];
 
     self.filterSeg = [[UISegmentedControl alloc] initWithItems:@[@"全部", @"K", @"D"]];
     self.filterSeg.selectedSegmentIndex = 0;
@@ -74,6 +78,9 @@
 - (void)dlp_close { [self dismissViewControllerAnimated:YES completion:nil]; }
 - (void)dlp_clear { [DLPLogHub clearLogs]; [self dlp_reload]; }
 - (void)dlp_refilter { [self dlp_applyFilter]; }
+
+/// 上传：调系统邮件把日志+类名地图发到用户 Gmail，助手用 Gmail 连接器直接读
+- (void)dlp_upload { [DLPLogUploader presentMailComposerFrom:self]; }
 
 /// 复制当前筛选结果到剪贴板（时间正序，最多 2000 行 / 200KB），直接粘贴发出来即可
 - (void)dlp_copy {

@@ -132,6 +132,7 @@ OBJS=("$BUILD"/*.o)
     "${OBJS[@]}" \
     -framework Foundation \
     -framework UIKit \
+    -framework MessageUI \
     -framework CoreGraphics \
     -framework QuartzCore \
     -framework CoreMedia \
