@@ -24,9 +24,13 @@
     self.navigationItem.leftBarButtonItem =
         [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
                                                      target:self action:@selector(dlp_close)];
-    self.navigationItem.rightBarButtonItem =
+    UIBarButtonItem *copyItem =
+        [[UIBarButtonItem alloc] initWithTitle:@"复制" style:UIBarButtonItemStylePlain
+                                        target:self action:@selector(dlp_copy)];
+    UIBarButtonItem *clearItem =
         [[UIBarButtonItem alloc] initWithTitle:@"清空" style:UIBarButtonItemStylePlain
                                         target:self action:@selector(dlp_clear)];
+    self.navigationItem.rightBarButtonItems = @[copyItem, clearItem];
 
     self.filterSeg = [[UISegmentedControl alloc] initWithItems:@[@"全部", @"K", @"D"]];
     self.filterSeg.selectedSegmentIndex = 0;
@@ -70,6 +74,28 @@
 - (void)dlp_close { [self dismissViewControllerAnimated:YES completion:nil]; }
 - (void)dlp_clear { [DLPLogHub clearLogs]; [self dlp_reload]; }
 - (void)dlp_refilter { [self dlp_applyFilter]; }
+
+/// 复制当前筛选结果到剪贴板（时间正序，最多 2000 行 / 200KB），直接粘贴发出来即可
+- (void)dlp_copy {
+    NSArray<NSString *> *lines = self.shownLines ?: @[];
+    NSMutableString *buf = [NSMutableString string];
+    // shownLines 是倒序（新在上），粘贴时改回正序方便阅读
+    NSInteger cap = MIN((NSInteger)lines.count, 2000);
+    for (NSInteger i = cap - 1; i >= 0; i--) {
+        NSString *l = lines[(NSUInteger)i];
+        if (buf.length + l.length > 200 * 1024) { break; }
+        [buf appendString:l];
+        [buf appendString:@"\n"];
+    }
+    [UIPasteboard generalPasteboard].string = buf;
+    UIAlertController *alert =
+        [UIAlertController alertControllerWithTitle:@"已复制"
+                                           message:[NSString stringWithFormat:@"%lu 行已进剪贴板，直接粘贴发送即可",
+                                                    (unsigned long)(cap)]
+                                    preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
 
 - (void)dlp_reload {
     self.allLines = [DLPLogHub allLogs];

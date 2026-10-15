@@ -551,6 +551,12 @@ NSDictionary *NSDictionaryOfVariableBindings_helper(void);
 - (void)addAction:(UIAlertAction *)action;
 @end
 
+// DLP 补：剪贴板复制按钮用
+@interface UIPasteboard : NSObject
++ (instancetype)generalPasteboard;
+@property (nonatomic, copy) NSString *string;
+@end
+
 // 系统分享面板：把沙盒里的取证文件（freeze_*.txt / 快照 JSON）交出去
 @interface UIActivityViewController : UIViewController
 - (instancetype)initWithActivityItems:(NSArray *)activityItems
