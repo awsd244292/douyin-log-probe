@@ -75,10 +75,18 @@ static const char *kDLPJumpSymbol = "showDYDSettingsVC";  // DYDSettingsPage.m
     ]];
 
     [self dlp_reload];
-    // 1s 刷新一次（只在可见时）
-    self.refreshTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self
-                                                       selector:@selector(dlp_reload)
-                                                       userInfo:nil repeats:YES];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    // 跳转插件设置再返回时恢复刷新（push/pop 会触发 willDisappear/willAppear，
+    // timer 只在 viewDidLoad 建的话，回来后列表就停更了）
+    if (!self.refreshTimer) {
+        self.refreshTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self
+                                                           selector:@selector(dlp_reload)
+                                                           userInfo:nil repeats:YES];
+    }
+    [self dlp_reload];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
