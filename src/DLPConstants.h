@@ -8,7 +8,7 @@
 #import <Foundation/Foundation.h>
 
 #define DLP_NAME    @"日志探针"
-#define DLP_VERSION @"1.0.0"
+#define DLP_VERSION @"1.5.2-beta"
 
 // 总开关（默认开；关则全部模块卸载，干净退出）
 #define kDLPEnabled @"DLPEnabled"

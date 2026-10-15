@@ -8,6 +8,7 @@
 #import "DLPLogHub.h"
 #import "DLPConstants.h"
 #import <objc/runtime.h>
+#import <objc/message.h>
 
 static DLPHookSlot s_presentVC = {0}, s_dismissVC = {0};
 static dispatch_source_t sPollTimer = nil;
