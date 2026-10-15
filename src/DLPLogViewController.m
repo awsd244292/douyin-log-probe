@@ -6,6 +6,18 @@
 #import "DLPLogViewController.h"
 #import "DLPLogHub.h"
 #import "DLPLogUploader.h"
+#import <dlfcn.h>
+
+// 可跳转的插件：symbol 是其 dylib 导出的设置入口 C 函数，dlsym 探测到才显示
+typedef struct {
+    const char *symbol;
+    const char *title;
+} DLPJumpTarget;
+static const DLPJumpTarget kDLPJumpTargets[] = {
+    { "showDYDSettingsVC", "抖音医生" },  // douyin-doctor（DYDSettingsPage.m）
+};
+static const NSUInteger kDLPJumpTargetCount =
+    sizeof(kDLPJumpTargets) / sizeof(kDLPJumpTargets[0]);
 
 @interface DLPLogViewController () <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
 @property(nonatomic, strong) UITableView *tableView;
@@ -45,13 +57,20 @@
     self.searchBar.placeholder = @"搜类名/事件/域，如 AWEUserService";
     self.searchBar.delegate = self;
 
+    // 插件跳转：主页显眼入口，查日志发现问题一键跳对应插件改设置
+    UIButton *jumpBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [jumpBtn setTitle:@"🔧 跳转插件设置" forState:UIControlStateNormal];
+    jumpBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [jumpBtn addTarget:self action:@selector(dlp_jumpPlugin)
+      forControlEvents:UIControlEventTouchUpInside];
+
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 44;
 
-    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[self.searchBar, self.tableView]];
+    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[jumpBtn, self.searchBar, self.tableView]];
     stack.axis = UILayoutConstraintAxisVertical;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:stack];
@@ -78,6 +97,67 @@
 - (void)dlp_close { [self dismissViewControllerAnimated:YES completion:nil]; }
 - (void)dlp_clear { [DLPLogHub clearLogs]; [self dlp_reload]; }
 - (void)dlp_refilter { [self dlp_applyFilter]; }
+
+#pragma mark - 插件跳转
+
+/// dlsym 探测已安装的可跳转插件，返回 kDLPJumpTargets 下标
+- (NSArray<NSNumber *> *)dlp_detectedPlugins {
+    NSMutableArray<NSNumber *> *out = [NSMutableArray array];
+    for (NSUInteger i = 0; i < kDLPJumpTargetCount; i++) {
+        if (dlsym(RTLD_DEFAULT, kDLPJumpTargets[i].symbol)) {
+            [out addObject:@(i)];
+        }
+    }
+    return out;
+}
+
+- (void)dlp_jumpPlugin {
+    NSArray<NSNumber *> *found = [self dlp_detectedPlugins];
+    if (found.count == 0) {
+        UIAlertController *alert =
+            [UIAlertController alertControllerWithTitle:@"没探测到"
+                                               message:@"当前进程里没发现已安装的可跳转插件"
+                                        preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    if (found.count == 1) {
+        [self dlp_openPlugin:(NSUInteger)[found[0] integerValue]];
+        return;
+    }
+    UIAlertController *sheet =
+        [UIAlertController alertControllerWithTitle:@"跳转到" message:nil
+                                    preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSNumber *n in found) {
+        NSUInteger i = (NSUInteger)[n integerValue];
+        NSString *title = [NSString stringWithUTF8String:kDLPJumpTargets[i].title];
+        [sheet addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault
+                                               handler:^(UIAlertAction *a) {
+            [self dlp_openPlugin:i];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    sheet.popoverPresentationController.sourceView = self.view;
+    sheet.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, 0, 1, 1);
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+/// 调目标插件的设置入口。本页已在导航栈里，对方 push 进来，返回键即回日志。
+- (void)dlp_openPlugin:(NSUInteger)idx {
+    if (idx >= kDLPJumpTargetCount) { return; }
+    void *sym = dlsym(RTLD_DEFAULT, kDLPJumpTargets[idx].symbol);
+    if (!sym) { return; }
+    void (*openSettings)(UIViewController *) = (void (*)(UIViewController *))sym;
+    @try {
+        openSettings(self);
+        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"%s",
+               kDLPJumpTargets[idx].title);
+    } @catch (NSException *e) {
+        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"fail=%@",
+               e.reason ?: @"?");
+    }
+}
 
 /// 上传：二级选单——邮件发送 / 分享面板（可分享进 Muse App）
 - (void)dlp_upload {
