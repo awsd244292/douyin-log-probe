@@ -9,7 +9,7 @@
 #import <MessageUI/MessageUI.h>
 
 // 收件人：用户自己的 Gmail（助手用 Gmail 连接器读取）
-static NSString *const kDLPUploadRecipient = @"2442921959@qq.com";
+static NSString *const kDLPUploadRecipient = @"awsd244292@gmail.com";
 
 @interface DLPLogUploader () <MFMailComposeViewControllerDelegate>
 @end
