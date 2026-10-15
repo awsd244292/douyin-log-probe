@@ -6,11 +6,6 @@
 #import "DLPLogViewController.h"
 #import "DLPLogHub.h"
 #import "DLPLogUploader.h"
-#import <dlfcn.h>
-
-// 跳转目标：用户自己的插件（douyin-doctor）导出的设置入口 C 函数。
-// dlsym 动态探测，零头文件依赖；未安装时按钮点不动（弹提示）。
-static const char *kDLPJumpSymbol = "showDYDSettingsVC";  // DYDSettingsPage.m
 
 @interface DLPLogViewController () <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
 @property(nonatomic, strong) UITableView *tableView;
@@ -50,9 +45,10 @@ static const char *kDLPJumpSymbol = "showDYDSettingsVC";  // DYDSettingsPage.m
     self.searchBar.placeholder = @"搜类名/事件/域，如 AWEUserService";
     self.searchBar.delegate = self;
 
-    // 插件跳转：主页显眼入口，查日志发现问题一键跳抖音医生改设置
+    // 插件跳转：蹭原生 UI。日志页是从探针设置分区（抖音原生设置页内）进来的，
+    // 跳转=关掉日志 modal 回到原生设置，医生分区就在那，不调任何插件自建 VC。
     UIButton *jumpBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [jumpBtn setTitle:@"🔧 抖音医生设置" forState:UIControlStateNormal];
+    [jumpBtn setTitle:@"🔧 回抖音设置" forState:UIControlStateNormal];
     jumpBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [jumpBtn addTarget:self action:@selector(dlp_jumpPlugin)
       forControlEvents:UIControlEventTouchUpInside];
@@ -99,27 +95,20 @@ static const char *kDLPJumpSymbol = "showDYDSettingsVC";  // DYDSettingsPage.m
 - (void)dlp_clear { [DLPLogHub clearLogs]; [self dlp_reload]; }
 - (void)dlp_refilter { [self dlp_applyFilter]; }
 
-#pragma mark - 插件跳转（只跳用户自己的插件：douyin-doctor）
+#pragma mark - 插件跳转（蹭原生 UI）
 
+// 不 dlsym、不调 douyin-doctor 的自建 VC：日志页是从探针设置分区
+// （抖音原生设置页内）modal 进来的，直接 dismiss 回到原生 UI。
+// 落点=探针设置分区，再点返回就是抖音设置主页（医生分区）。
 - (void)dlp_jumpPlugin {
-    void *sym = dlsym(RTLD_DEFAULT, kDLPJumpSymbol);
-    if (!sym) {
-        UIAlertController *alert =
-            [UIAlertController alertControllerWithTitle:@"没探测到"
-                                               message:@"当前进程里没发现抖音医生（douyin-doctor）"
-                                        preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
-        [self presentViewController:alert animated:YES completion:nil];
-        return;
-    }
-    void (*openSettings)(UIViewController *) = (void (*)(UIViewController *))sym;
-    @try {
-        // 本页已在导航栈里：对方设置页 push 进来，返回键即回日志
-        openSettings(self);
-        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"douyin-doctor");
-    } @catch (NSException *e) {
-        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"fail=%@",
-               e.reason ?: @"?");
+    UINavigationController *nav = self.navigationController;
+    void (^done)(void) = ^{
+        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"backToNativeSettings");
+    };
+    if (nav) {
+        [nav dismissViewControllerAnimated:YES completion:done];
+    } else {
+        [self dismissViewControllerAnimated:YES completion:done];
     }
 }
 
