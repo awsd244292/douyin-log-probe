@@ -7,12 +7,17 @@
 #import "DLPLogHub.h"
 #import "DLPLogUploader.h"
 #import "DLPConstants.h"
+#import <dlfcn.h>
+
+// 直达医生设置：douyin-doctor 导出的设置入口 C 函数（DYDSettingsPage.m），
+// dlsym 动态探测，零头文件依赖；未安装时弹提示。
+static const char *kDLPDoctorSymbol = "showDYDSettingsVC";
 
 @interface DLPLogViewController () <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
 @property(nonatomic, strong) UITableView *tableView;
 @property(nonatomic, strong) UISearchBar *searchBar;
 @property(nonatomic, strong) UISegmentedControl *filterSeg;
-@property(nonatomic, strong) UIButton *jumpButton;
+@property(nonatomic, strong) UIStackView *jumpRow;
 @property(nonatomic, strong) NSArray<NSString *> *allLines;
 @property(nonatomic, strong) NSArray<NSString *> *shownLines;
 @property(nonatomic, strong) NSTimer *refreshTimer;
@@ -47,15 +52,24 @@
     self.searchBar.placeholder = @"搜类名/事件/域，如 AWEUserService";
     self.searchBar.delegate = self;
 
-    // 插件跳转：蹭原生 UI。日志页是从探针设置分区（抖音原生设置页内）进来的，
-    // 跳转=关掉日志 modal 回到原生设置，医生分区就在那，不调任何插件自建 VC。
-    // 开关 kDLPJumpButtonEnabled（默认开），viewWillAppear 里按开关显隐。
-    UIButton *jumpBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [jumpBtn setTitle:@"🔧 回抖音设置" forState:UIControlStateNormal];
-    jumpBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
-    [jumpBtn addTarget:self action:@selector(dlp_jumpPlugin)
+    // 跳转入口（两个都留，用户自己选）：
+    //  1. 「回抖音设置」——蹭原生 UI：dismiss 日志 modal 回到探针设置分区
+    //  2. 「医生设置」——dlsym 直达 douyin-doctor 设置页（push 进来，返回即回日志）
+    // 开关 kDLPJumpButtonEnabled（默认开），viewWillAppear 里按开关显隐整行。
+    UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [backBtn setTitle:@"🔧 回抖音设置" forState:UIControlStateNormal];
+    backBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [backBtn addTarget:self action:@selector(dlp_backToSettings)
       forControlEvents:UIControlEventTouchUpInside];
-    self.jumpButton = jumpBtn;
+    UIButton *docBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [docBtn setTitle:@"🩺 医生设置" forState:UIControlStateNormal];
+    docBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [docBtn addTarget:self action:@selector(dlp_jumpDoctor)
+      forControlEvents:UIControlEventTouchUpInside];
+    UIStackView *jumpRow = [[UIStackView alloc] initWithArrangedSubviews:@[backBtn, docBtn]];
+    jumpRow.axis = UILayoutConstraintAxisHorizontal;
+    jumpRow.distribution = UIStackViewDistributionFillEqually;
+    self.jumpRow = jumpRow;
 
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.dataSource = self;
@@ -63,7 +77,7 @@
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 44;
 
-    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[jumpBtn, self.searchBar, self.tableView]];
+    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[jumpRow, self.searchBar, self.tableView]];
     stack.axis = UILayoutConstraintAxisVertical;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:stack];
@@ -80,7 +94,7 @@
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     // 跳转按钮开关（默认开）：UIStackView 会自动折叠 hidden 的子视图
-    self.jumpButton.hidden = !DLPGetBoolDef(kDLPJumpButtonEnabled, YES);
+    self.jumpRow.hidden = !DLPGetBoolDef(kDLPJumpButtonEnabled, YES);
     // 跳转插件设置再返回时恢复刷新（push/pop 会触发 willDisappear/willAppear，
     // timer 只在 viewDidLoad 建的话，回来后列表就停更了）
     if (!self.refreshTimer) {
@@ -101,20 +115,42 @@
 - (void)dlp_clear { [DLPLogHub clearLogs]; [self dlp_reload]; }
 - (void)dlp_refilter { [self dlp_applyFilter]; }
 
-#pragma mark - 插件跳转（蹭原生 UI）
+#pragma mark - 跳转入口（两个都留）
 
-// 不 dlsym、不调 douyin-doctor 的自建 VC：日志页是从探针设置分区
-// （抖音原生设置页内）modal 进来的，直接 dismiss 回到原生 UI。
-// 落点=探针设置分区，再点返回就是抖音设置主页（医生分区）。
-- (void)dlp_jumpPlugin {
+/// 1. 回抖音设置：蹭原生 UI。日志页是从探针设置分区（抖音原生设置页内）
+/// modal 进来的，直接 dismiss 回到原生 UI，不调任何插件自建 VC。
+- (void)dlp_backToSettings {
     UINavigationController *nav = self.navigationController;
     void (^done)(void) = ^{
-        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"backToNativeSettings");
+        DLPLog(@"sys", YES, @"DLPLogViewController", @"backToSettings", @"ok");
     };
     if (nav) {
         [nav dismissViewControllerAnimated:YES completion:done];
     } else {
         [self dismissViewControllerAnimated:YES completion:done];
+    }
+}
+
+/// 2. 直达医生设置：dlsym 调 douyin-doctor 的 showDYDSettingsVC，
+/// 对方设置页 push 进当前导航栈，返回键即回日志。
+- (void)dlp_jumpDoctor {
+    void *sym = dlsym(RTLD_DEFAULT, kDLPDoctorSymbol);
+    if (!sym) {
+        UIAlertController *alert =
+            [UIAlertController alertControllerWithTitle:@"没探测到"
+                                               message:@"当前进程里没发现抖音医生（douyin-doctor）"
+                                        preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    void (*openSettings)(UIViewController *) = (void (*)(UIViewController *))sym;
+    @try {
+        openSettings(self);
+        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpDoctor", @"ok");
+    } @catch (NSException *e) {
+        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpDoctor", @"fail=%@",
+               e.reason ?: @"?");
     }
 }
 
