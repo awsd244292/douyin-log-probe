@@ -32,6 +32,9 @@ static NSDictionary<NSString *, NSString *> *DLPKnownHookedClasses(void) {
             // 另一个窗口 port 的 DYYY 2.3-0（douyin-doctor 内）
             @"DYDLoginBypassManager" : @"DYD",
             @"DYYYLoginBypass" : @"bypass",
+            // douyin-doctor 下载/接口解析（探针跨插件捕获）
+            @"DYDDownloadManager" : @"DYD,DLP",
+            @"DYDUtils" : @"DYD,DLP",
             @"AWELoginViewController" : @"bypass,DLP",
             @"AWEPhoneLoginViewController" : @"bypass,DLP",
             @"AWENormalLoginViewController" : @"bypass,DLP",

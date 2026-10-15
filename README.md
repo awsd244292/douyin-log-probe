@@ -10,7 +10,7 @@
 |---|---|
 | DLPOrchestrator | 总控：applyCurrentProfile / shutdownAll，总开关前置 |
 | DLPClassProbe | 类名探针：runtime 全量枚举 → 按 image/前缀聚类 → 落盘 `classmap.json`，交叉标注三插件已知 hook 类 |
-| DLPEventTracer | 大小事：页面跳转 / sendEvent 全量 / 网络请求 / AVPlayer 6 方法 / TTVideoEngine 5 方法 / 登录监听 2 点 + 绕过登录 6 点（AWEAccountManager-isLogin/hasLogin、AWEUserAccount-isLogin、三个登录VC） / NSBundle / 数据落盘嗅探 |
+| DLPEventTracer | 大小事：页面跳转 / sendEvent 全量 / 网络请求 / AVPlayer 6 方法 / TTVideoEngine 5 方法 / 登录监听 2 点 + 绕过登录 6 点（AWEAccountManager-isLogin/hasLogin、AWEUserAccount-isLogin、三个登录VC） / NSBundle / 数据落盘嗅探 / douyin-doctor 接口解析捕获（parseWithShareLink 脱敏+keyTail、handleVideoData 的 data keys/video_list 前 3/images 数、showToast 接口失败原因） |
 | DLPPerfProbe | FPS（CADisplayLink）/ 内存（task_info 15s）/ 主线程卡顿看门狗（observer+独立线程双路） |
 | DLPCrashCatcher | 12 信号 sigaction + 备用栈 + 未捕获异常 + 60s 自愈定时器 |
 | DLPBypassCatcher | 绕过登录专用捕捉器：三开关 key + 官方 isLogin/userID 轮询（变化才记）、present/dismiss 追踪、3s 未 dismiss 告警、开关 ON→OFF 翻转告警（疑似 DYYY 自动禁用） |

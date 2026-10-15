@@ -22,6 +22,8 @@ static DLPHookSlot s_loginVCAppear = {0}, s_phoneLoginVCAppear = {0}, s_normalLo
 static DLPHookSlot s_bundleID = {0}, s_bundleInfoKey = {0}, s_bundleInfo = {0};
 static DLPHookSlot s_udSet = {0};
 static DLPHookSlot s_fmCreate = {0}, s_fmRemove = {0};
+// douyin-doctor 接口解析捕获（DYD*，另一个插件的类）
+static DLPHookSlot s_dydParse = {0}, s_dydHandleData = {0}, s_dydToast = {0};
 
 #pragma mark - 页面跳转（K）
 
@@ -293,6 +295,108 @@ static BOOL dlp_fmRemove(id self, SEL _cmd, id path, id *error) {
     return r;
 }
 
+#pragma mark - douyin-doctor 接口解析捕获（DYD）
+// 背景：同一解析接口，DYY 解析视频正常，douyin-doctor 却返回 14 张图片 URL，
+// 怀疑请求构造有差异。抓三处：
+//  1. parseWithShareLink:apiKey:fallbackKey: → 脱敏 apiUrl（只留域名+路径，
+//     query 里的 key 一律丢掉）+ apiKey 末尾分隔符（DYY/douyin-doctor 构造差异头号嫌疑：
+//     douyin-doctor 是 apiKey 直接拼分享链接，无分隔符）
+//  2. handleVideoData: → data 的 keys + video_list 前 3 个 url + images 数量
+//  3. showToast: → 只收含"接口"的（失败原因）
+// 注意 DYD* 类在另一个插件里，加载可能晚于本探针，安装带延迟重试。
+
+/// 脱敏：只留 scheme://host/path，query（带 key）一律丢掉
+static NSString *DLPDesensitizedHostPath(NSString *urlString) {
+    @try {
+        NSURL *u = [NSURL URLWithString:urlString];
+        if (!u.host) { return @"?"; }
+        NSString *path = u.path ?: @"";
+        if (path.length > 80) { path = [path substringToIndex:80]; }
+        return [NSString stringWithFormat:@"%@://%@%@", u.scheme ?: @"?", u.host, path];
+    } @catch (NSException *e) { return @"?"; }
+}
+
+static void dlp_dydParse(id self, SEL _cmd, id shareLink, id apiKey, id fallbackKey) {
+    void (*orig)(id, SEL, id, id, id) = (void (*)(id, SEL, id, id, id))s_dydParse.orig;
+    @try {
+        NSString *api = [apiKey isKindOfClass:[NSString class]] ? apiKey : @"";
+        NSString *share = [shareLink isKindOfClass:[NSString class]] ? shareLink : @"";
+        // 脱敏：apiUrl = apiKey + encode(shareLink)，host+path 等于 apiKey 的 host+path
+        NSString *apiHP = DLPDesensitizedHostPath(api);
+        // 关键诊断点：apiKey 末尾字符（= / & / ? / 无）
+        NSString *tail = @"none";
+        if (api.length > 0) {
+            unichar c = [api characterAtIndex:api.length - 1];
+            if (c == '=' || c == '&' || c == '?' || c == '/') {
+                tail = [NSString stringWithFormat:@"%C", c];
+            }
+        }
+        NSString *shareHost = @"?";
+        @try { NSURL *su = [NSURL URLWithString:share]; shareHost = su.host ?: @"?"; }
+        @catch (NSException *e2) {}
+        BOOL hasFallback = [fallbackKey isKindOfClass:[NSString class]] && ((NSString *)fallbackKey).length > 0;
+        DLPLog(@"net", YES, @"DYDDownloadManager", @"parseWithShareLink:",
+               @"api=%@,keyTail=%@,shareHost=%@,shareLen=%lu,fallback=%d",
+               apiHP, tail, shareHost, (unsigned long)share.length, hasFallback);
+    } @catch (NSException *e) {}
+    if (orig) orig(self, _cmd, shareLink, apiKey, fallbackKey);
+}
+
+static void dlp_dydHandleData(id self, SEL _cmd, id dataDict) {
+    void (*orig)(id, SEL, id) = (void (*)(id, SEL, id))s_dydHandleData.orig;
+    @try {
+        if ([dataDict isKindOfClass:[NSDictionary class]]) {
+            NSDictionary *d = (NSDictionary *)dataDict;
+            NSString *keys = [[d allKeys] componentsJoinedByString:@","];
+            NSMutableString *urls = [NSMutableString string];
+            id vl = d[@"video_list"];
+            if ([vl isKindOfClass:[NSArray class]]) {
+                NSArray *arr = (NSArray *)vl;
+                for (NSUInteger i = 0; i < MIN(3, arr.count); i++) {
+                    id item = arr[i];
+                    NSString *u = [item isKindOfClass:[NSDictionary class]] ? item[@"url"] : nil;
+                    if (![u isKindOfClass:[NSString class]]) { u = @"?"; }
+                    if (u.length > 120) { u = [u substringToIndex:120]; }
+                    [urls appendFormat:@"[%lu]%@;", (unsigned long)i, u];
+                }
+                [urls appendFormat:@"(total %lu)", (unsigned long)arr.count];
+            }
+            id images = d[@"images"];
+            NSUInteger imgCount = [images isKindOfClass:[NSArray class]] ? ((NSArray *)images).count : 0;
+            DLPLog(@"net", YES, @"DYDDownloadManager", @"handleVideoData:",
+                   @"keys=%@,videoList=%@,images=%lu", keys, urls, (unsigned long)imgCount);
+        }
+    } @catch (NSException *e) {}
+    if (orig) orig(self, _cmd, dataDict);
+}
+
+static void dlp_dydToast(id self, SEL _cmd, id text) {
+    void (*orig)(id, SEL, id) = (void (*)(id, SEL, id))s_dydToast.orig;
+    if (orig) orig(self, _cmd, text);
+    @try {
+        // 只收接口解析相关的 toast（失败原因），其他 toast 不记
+        if ([text isKindOfClass:[NSString class]] &&
+            [text rangeOfString:@"接口"].location != NSNotFound) {
+            NSString *t = (NSString *)text;
+            if (t.length > 120) { t = [t substringToIndex:120]; }
+            DLPLog(@"net", YES, @"DYDUtils", @"showToast:", @"%@", t);
+        }
+    } @catch (NSException *e) {}
+}
+
+/// DYD 钩子安装（幂等；类不存在则静默跳过，调用方负责延迟重试）
+static void DLPInstallDYDHooks(void) {
+    DLPHookInstall(&s_dydParse, "DYDDownloadManager",
+                   @selector(parseWithShareLink:apiKey:fallbackKey:),
+                   (IMP)dlp_dydParse, YES);
+    DLPHookInstall(&s_dydHandleData, "DYDDownloadManager",
+                   @selector(handleVideoData:),
+                   (IMP)dlp_dydHandleData, YES);
+    DLPHookInstall(&s_dydToast, "DYDUtils",
+                   @selector(showToast:),
+                   (IMP)dlp_dydToast, YES);
+}
+
 #pragma mark - 装配
 
 /// 标量参数 hook 的安全安装：签名对不上就跳过并记日志（K 级），宁可少抓一条也不崩
@@ -346,6 +450,12 @@ static void DLPInstallCheckedOrSkip(DLPHookSlot *slot, const char *clsName, SEL 
     DLPHookInstall(&s_udSet, "NSUserDefaults", @selector(setObject:forKey:), (IMP)dlp_udSet, NO);
     DLPHookInstall(&s_fmCreate, "NSFileManager", @selector(createFileAtPath:contents:attributes:), (IMP)dlp_fmCreate, NO);
     DLPHookInstall(&s_fmRemove, "NSFileManager", @selector(removeItemAtPath:error:), (IMP)dlp_fmRemove, NO);
+    // douyin-doctor 接口解析捕获（DYD* 在另一个插件里，可能晚加载：立即试一次 + 20s 后重试，幂等）
+    DLPInstallDYDHooks();
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_SEC),
+                   dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
+        DLPInstallDYDHooks();
+    });
     DLPLog(@"sys", YES, @"DLPEventTracer", @"install", @"done");
 }
 
@@ -363,6 +473,7 @@ static void DLPInstallCheckedOrSkip(DLPHookSlot *slot, const char *clsName, SEL 
     DLPHookRemove(&s_bundleID); DLPHookRemove(&s_bundleInfoKey); DLPHookRemove(&s_bundleInfo);
     DLPHookRemove(&s_udSet);
     DLPHookRemove(&s_fmCreate); DLPHookRemove(&s_fmRemove);
+    DLPHookRemove(&s_dydParse); DLPHookRemove(&s_dydHandleData); DLPHookRemove(&s_dydToast);
 }
 
 @end

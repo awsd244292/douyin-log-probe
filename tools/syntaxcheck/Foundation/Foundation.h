@@ -414,6 +414,10 @@ extern NSNotificationName const NSNotificationNameNone;
 + (instancetype)URLWithString:(NSString *)s;
 + (instancetype)fileURLWithPath:(NSString *)path;
 @property (nonatomic, readonly, copy) NSString *lastPathComponent;
+// DLP 补：接口解析脱敏用
+@property (nonatomic, readonly, copy) NSString *scheme;
+@property (nonatomic, readonly, copy) NSString *host;
+@property (nonatomic, readonly, copy) NSString *path;
 @end
 
 @interface NSURLResponse : NSObject
