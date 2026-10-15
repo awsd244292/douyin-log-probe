@@ -17,6 +17,7 @@
 | DLPLogUploader | 日志上传：调系统邮件把日志+classmap.json 发到用户 Gmail（附件），助手用 Gmail 连接器直接读；本机没配邮件帐户时提示改用「复制」 |
 | DLPLogHub | 日志中枢：`ts\|K\|domain\|class\|event\|detail`；NSLog + 内存 2000 行 + 落盘 `Documents/DLPLogs/` 按日轮转（保留 7 天） |
 | DLPSettings | 设置页注入 `AWESettingsViewModel.sectionDataArray` → 「日志探针」分区，开关热切换 |
+| DLPLogViewController | 实时日志主页：K/D/全部三档 + 搜索 + 复制/上传（邮件/分享面板）+ 顶部「🔧 跳转插件设置」（dlsym 探测 douyin-doctor 的 `showDYDSettingsVC`，push 进导航栈，返回即回日志） |
 
 ## 日志格式（AI 可读）
 
