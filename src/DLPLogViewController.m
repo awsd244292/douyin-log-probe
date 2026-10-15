@@ -280,6 +280,38 @@ static void DLPAnchorPopover(UIViewController *presented, UIViewController *srcV
     return cell;
 }
 
+/// 点行：类名/整行可点——弹选单（复制类名 / 按此类筛选 / 复制整行）
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    NSString *line = self.shownLines[(NSUInteger)indexPath.row];
+    if (!line.length) { return; }
+    // 格式 ts|K|domain|class|event|detail，class 是第 4 段
+    NSArray<NSString *> *parts = [line componentsSeparatedByString:@"|"];
+    NSString *cls = parts.count > 3 ? parts[3] : @"";
+    UIAlertController *sheet =
+        [UIAlertController alertControllerWithTitle:cls.length ? cls : @"日志行"
+                                            message:nil
+                                     preferredStyle:UIAlertControllerStyleActionSheet];
+    if (cls.length) {
+        [sheet addAction:[UIAlertAction actionWithTitle:@"复制类名" style:UIAlertActionStyleDefault
+                                               handler:^(UIAlertAction *a) {
+            [UIPasteboard generalPasteboard].string = cls;
+        }]];
+        [sheet addAction:[UIAlertAction actionWithTitle:@"按此类筛选" style:UIAlertActionStyleDefault
+                                               handler:^(UIAlertAction *a) {
+            self.searchBar.text = cls;
+            [self dlp_applyFilter];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"复制整行" style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *a) {
+        [UIPasteboard generalPasteboard].string = line;
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    DLPAnchorPopover(sheet, self);
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
 #pragma mark - UISearchBarDelegate
 
 - (void)searchBar:(UISearchBar *)searchBar textDidChange:(NSString *)searchText {
