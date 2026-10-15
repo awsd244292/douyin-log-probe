@@ -6,7 +6,6 @@
 #import "DLPLogViewController.h"
 #import "DLPLogHub.h"
 #import "DLPLogUploader.h"
-#import "DLPConstants.h"
 #import <dlfcn.h>
 
 // 直达医生设置：douyin-doctor 导出的设置入口 C 函数（DYDSettingsPage.m），
@@ -55,7 +54,6 @@ static const char *kDLPDoctorSymbol = "showDYDSettingsVC";
     // 跳转入口（两个都留，用户自己选）：
     //  1. 「回抖音设置」——蹭原生 UI：dismiss 日志 modal 回到探针设置分区
     //  2. 「医生设置」——dlsym 直达 douyin-doctor 设置页（push 进来，返回即回日志）
-    // 开关 kDLPJumpButtonEnabled（默认开），viewWillAppear 里按开关显隐整行。
     UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [backBtn setTitle:@"🔧 回抖音设置" forState:UIControlStateNormal];
     backBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
@@ -93,8 +91,7 @@ static const char *kDLPDoctorSymbol = "showDYDSettingsVC";
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    // 跳转按钮开关（默认开）：UIStackView 会自动折叠 hidden 的子视图
-    self.jumpRow.hidden = !DLPGetBoolDef(kDLPJumpButtonEnabled, YES);
+    // 跳转双按钮常驻（用户定：点一下就跳，不用开关）
     // 跳转插件设置再返回时恢复刷新（push/pop 会触发 willDisappear/willAppear，
     // timer 只在 viewDidLoad 建的话，回来后列表就停更了）
     if (!self.refreshTimer) {

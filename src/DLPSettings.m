@@ -104,8 +104,6 @@ static NSArray *dlp_sectionDataArray(id self, SEL _cmd) {
         if (it) [items addObject:it];
         it = DLPMakeSwitchItem(kDLPStderrCapture, @"收其他插件日志", @"stderr重定向：DYYY/DCL/aweJ", YES);
         if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPJumpButtonEnabled, @"跳转按钮", @"日志页顶部「回抖音设置」入口", YES);
-        if (it) [items addObject:it];
         it = DLPMakeSwitchItem(kDLPModuleLongPressEntry, @"长按面板入口", @"视频长按菜单加「查看日志」", YES);
         if (it) [items addObject:it];
         it = DLPMakeTapItem(@"DLPViewLogs", @"查看实时日志", @"内存2000行，支持搜索", ^{

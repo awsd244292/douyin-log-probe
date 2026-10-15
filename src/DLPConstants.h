@@ -34,9 +34,6 @@
 // 若同时装了 CrashLogger，两家都重定向 stderr，后装的生效）
 #define kDLPStderrCapture @"DLPStderrCapture"
 
-// 日志页顶部「回抖音设置」跳转按钮（默认开，不用可关）
-#define kDLPJumpButtonEnabled @"DLPJumpButtonEnabled"
-
 // 取值宏
 #define DLPGetBool(key) [[NSUserDefaults standardUserDefaults] boolForKey:key]
 #define DLPGetInteger(key) [[NSUserDefaults standardUserDefaults] integerForKey:key]
