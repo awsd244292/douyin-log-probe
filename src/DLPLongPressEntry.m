@@ -11,7 +11,10 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-static DLPHookSlot s_lpDataArray = {0};
+// 双类 hook：DYY hook 两个面板类（Modern 新版 + 旧版），39.7.0 可能用旧版。
+// 两个 slot 各存各的 orig，替换函数按 self 的实际类名分发。
+static DLPHookSlot s_lpDataArrayModern = {0};
+static DLPHookSlot s_lpDataArrayLegacy = {0};
 
 /// 从 presenter（或 keyWindow）找到当前最顶 VC
 static UIViewController *DLPLP_TopVC(UIViewController *hint) {
@@ -32,7 +35,15 @@ static UIViewController *DLPLP_TopVC(UIViewController *hint) {
 }
 
 static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
-    NSArray *(*orig)(id, SEL) = (NSArray *(*)(id, SEL))s_lpDataArray.orig;
+    // 按 self 的实际类找对应的 orig（双类 hook，各调各的 orig，链式共存）
+    DLPHookSlot *slot = &s_lpDataArrayModern;
+    @try {
+        if ([NSStringFromClass([self class])
+                isEqualToString:@"AWELongPressPanelTableViewController"]) {
+            slot = &s_lpDataArrayLegacy;
+        }
+    } @catch (NSException *e) {}
+    NSArray *(*orig)(id, SEL) = (NSArray *(*)(id, SEL))slot->orig;
     NSArray *original = orig ? orig(self, _cmd) : @[];
     if (!original) { original = @[]; }
     // 开关：默认开，不用可关
@@ -101,12 +112,16 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
 @implementation DLPLongPressEntry
 
 + (void)install {
-    DLPHookInstall(&s_lpDataArray, "AWEModernLongPressPanelTableViewController",
+    // 两个面板类都 hook（Modern 新版 + 旧版），哪个存在 hook 哪个
+    DLPHookInstall(&s_lpDataArrayModern, "AWEModernLongPressPanelTableViewController",
+                   @selector(dataArray), (IMP)dlp_longPressDataArray, NO);
+    DLPHookInstall(&s_lpDataArrayLegacy, "AWELongPressPanelTableViewController",
                    @selector(dataArray), (IMP)dlp_longPressDataArray, NO);
 }
 
 + (void)uninstall {
-    DLPHookRemove(&s_lpDataArray);
+    DLPHookRemove(&s_lpDataArrayModern);
+    DLPHookRemove(&s_lpDataArrayLegacy);
 }
 
 @end
