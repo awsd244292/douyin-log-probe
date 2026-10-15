@@ -11,10 +11,12 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-// 双类 hook：DYY hook 两个面板类（Modern 新版 + 旧版），39.7.0 可能用旧版。
-// 两个 slot 各存各的 orig，替换函数按 self 的实际类名分发。
+// 三类 hook：DYY hook 两个面板类（Modern 新版 + 旧版），39.7.0 可能用旧版；
+// 用户日志又发现 AWEVideoLongPressPanelViewController（外层容器），也加上。
+// 三个 slot 各存各的 orig，替换函数按 self 的实际类名分发。
 static DLPHookSlot s_lpDataArrayModern = {0};
 static DLPHookSlot s_lpDataArrayLegacy = {0};
+static DLPHookSlot s_lpDataArrayVideo = {0};
 
 /// 从 presenter（或 keyWindow）找到当前最顶 VC
 static UIViewController *DLPLP_TopVC(UIViewController *hint) {
@@ -35,12 +37,14 @@ static UIViewController *DLPLP_TopVC(UIViewController *hint) {
 }
 
 static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
-    // 按 self 的实际类找对应的 orig（双类 hook，各调各的 orig，链式共存）
+    // 按 self 的实际类找对应的 orig（三类 hook，各调各的 orig，链式共存）
     DLPHookSlot *slot = &s_lpDataArrayModern;
     @try {
-        if ([NSStringFromClass([self class])
-                isEqualToString:@"AWELongPressPanelTableViewController"]) {
+        NSString *clsName = NSStringFromClass([self class]);
+        if ([clsName isEqualToString:@"AWELongPressPanelTableViewController"]) {
             slot = &s_lpDataArrayLegacy;
+        } else if ([clsName isEqualToString:@"AWEVideoLongPressPanelViewController"]) {
+            slot = &s_lpDataArrayVideo;
         }
     } @catch (NSException *e) {}
     NSArray *(*orig)(id, SEL) = (NSArray *(*)(id, SEL))slot->orig;
@@ -112,16 +116,19 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
 @implementation DLPLongPressEntry
 
 + (void)install {
-    // 两个面板类都 hook（Modern 新版 + 旧版），哪个存在 hook 哪个
+    // 三个面板类都 hook（Modern 新版 + 旧版 + Video 外层容器），哪个存在 hook 哪个
     DLPHookInstall(&s_lpDataArrayModern, "AWEModernLongPressPanelTableViewController",
                    @selector(dataArray), (IMP)dlp_longPressDataArray, NO);
     DLPHookInstall(&s_lpDataArrayLegacy, "AWELongPressPanelTableViewController",
+                   @selector(dataArray), (IMP)dlp_longPressDataArray, NO);
+    DLPHookInstall(&s_lpDataArrayVideo, "AWEVideoLongPressPanelViewController",
                    @selector(dataArray), (IMP)dlp_longPressDataArray, NO);
 }
 
 + (void)uninstall {
     DLPHookRemove(&s_lpDataArrayModern);
     DLPHookRemove(&s_lpDataArrayLegacy);
+    DLPHookRemove(&s_lpDataArrayVideo);
 }
 
 @end
