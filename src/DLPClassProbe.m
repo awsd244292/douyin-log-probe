@@ -29,6 +29,9 @@ static NSDictionary<NSString *, NSString *> *DLPKnownHookedClasses(void) {
             // 用户自研绕登录方案 hook 的类（awsd244292/DYYY-login-bypass）
             @"AWEAccountManager" : @"bypass,DLP",
             @"AWEUserAccount" : @"bypass,DLP",
+            // 另一个窗口 port 的 DYYY 2.3-0（douyin-doctor 内）
+            @"DYDLoginBypassManager" : @"DYD",
+            @"DYYYLoginBypass" : @"bypass",
             @"AWELoginViewController" : @"bypass,DLP",
             @"AWEPhoneLoginViewController" : @"bypass,DLP",
             @"AWENormalLoginViewController" : @"bypass,DLP",

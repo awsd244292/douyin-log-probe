@@ -96,6 +96,8 @@ static NSArray *dlp_sectionDataArray(id self, SEL _cmd) {
         if (it) [items addObject:it];
         it = DLPMakeSwitchItem(kDLPModuleCrashCatcher, @"崩溃抓捕", @"12信号+未捕获异常", YES);
         if (it) [items addObject:it];
+        it = DLPMakeSwitchItem(kDLPModuleBypassCatcher, @"绕过登录捕捉器", @"诊断bypass失效：开关/官方真相/弹窗时间线", YES);
+        if (it) [items addObject:it];
         it = DLPMakeSwitchItem(kDLPDetailEnabled, @"细节日志", @"全量默认开：D级与K级同步输出", YES);
         if (it) [items addObject:it];
         it = DLPMakeSwitchItem(kDLPLogToFile, @"落盘日志", @"Documents/DLPLogs/ 按日轮转", YES);

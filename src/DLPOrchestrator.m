@@ -10,6 +10,7 @@
 #import "DLPEventTracer.h"
 #import "DLPPerfProbe.h"
 #import "DLPCrashCatcher.h"
+#import "DLPBypassCatcher.h"
 #import "DLPSettings.h"
 #import <fcntl.h>
 #import <unistd.h>
@@ -84,6 +85,8 @@ static void DLPRemoveStderrCapture(void) {
         else { [DLPPerfProbe uninstall]; }
         if (DLPGetBoolDef(kDLPModuleCrashCatcher, YES)) { [DLPCrashCatcher install]; }
         else { [DLPCrashCatcher uninstall]; }
+        if (DLPGetBoolDef(kDLPModuleBypassCatcher, YES)) { [DLPBypassCatcher install]; }
+        else { [DLPBypassCatcher uninstall]; }
         if (DLPGetBoolDef(kDLPStderrCapture, YES)) { DLPInstallStderrCapture(); }
         else { DLPRemoveStderrCapture(); }
         [DLPSettings install]; // 设置页入口常驻（CrashLogger 同款：无卸载）
@@ -97,6 +100,7 @@ static void DLPRemoveStderrCapture(void) {
     [DLPEventTracer uninstall];
     [DLPPerfProbe uninstall];
     [DLPCrashCatcher uninstall];
+    [DLPBypassCatcher uninstall];
     DLPRemoveStderrCapture();
     DLPLog(@"sys", YES, @"DLPOrchestrator", @"shutdownAll", @"all modules off");
 }

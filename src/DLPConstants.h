@@ -18,6 +18,7 @@
 #define kDLPModuleEventTracer  @"DLPModuleEventTracer"
 #define kDLPModulePerfProbe    @"DLPModulePerfProbe"
 #define kDLPModuleCrashCatcher @"DLPModuleCrashCatcher"
+#define kDLPModuleBypassCatcher @"DLPModuleBypassCatcher" // 绕过登录专用捕捉器（默认开）
 
 // 细节日志总闸（默认开：全量默认开；K 级关键日志常驻，D 级细节同步输出）
 #define kDLPDetailEnabled @"DLPDetailEnabled"
