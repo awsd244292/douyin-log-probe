@@ -6,11 +6,13 @@
 #import "DLPLogViewController.h"
 #import "DLPLogHub.h"
 #import "DLPLogUploader.h"
+#import "DLPConstants.h"
 
 @interface DLPLogViewController () <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
 @property(nonatomic, strong) UITableView *tableView;
 @property(nonatomic, strong) UISearchBar *searchBar;
 @property(nonatomic, strong) UISegmentedControl *filterSeg;
+@property(nonatomic, strong) UIButton *jumpButton;
 @property(nonatomic, strong) NSArray<NSString *> *allLines;
 @property(nonatomic, strong) NSArray<NSString *> *shownLines;
 @property(nonatomic, strong) NSTimer *refreshTimer;
@@ -47,11 +49,13 @@
 
     // 插件跳转：蹭原生 UI。日志页是从探针设置分区（抖音原生设置页内）进来的，
     // 跳转=关掉日志 modal 回到原生设置，医生分区就在那，不调任何插件自建 VC。
+    // 开关 kDLPJumpButtonEnabled（默认开），viewWillAppear 里按开关显隐。
     UIButton *jumpBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [jumpBtn setTitle:@"🔧 回抖音设置" forState:UIControlStateNormal];
     jumpBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [jumpBtn addTarget:self action:@selector(dlp_jumpPlugin)
       forControlEvents:UIControlEventTouchUpInside];
+    self.jumpButton = jumpBtn;
 
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.dataSource = self;
@@ -75,6 +79,8 @@
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    // 跳转按钮开关（默认开）：UIStackView 会自动折叠 hidden 的子视图
+    self.jumpButton.hidden = !DLPGetBoolDef(kDLPJumpButtonEnabled, YES);
     // 跳转插件设置再返回时恢复刷新（push/pop 会触发 willDisappear/willAppear，
     // timer 只在 viewDidLoad 建的话，回来后列表就停更了）
     if (!self.refreshTimer) {
