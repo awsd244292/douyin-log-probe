@@ -17,7 +17,7 @@
 | DLPLogUploader | 日志上传：调系统邮件把日志+classmap.json 发到用户 Gmail（附件），助手用 Gmail 连接器直接读；本机没配邮件帐户时提示改用「复制」 |
 | DLPLogHub | 日志中枢：`ts\|K\|domain\|class\|event\|detail`；NSLog + 内存 2000 行 + 落盘 `Documents/DLPLogs/` 按日轮转（保留 7 天） |
 | DLPSettings | 设置页注入 `AWESettingsViewModel.sectionDataArray` → 「日志探针」分区，开关热切换 |
-| DLPLogViewController | 实时日志主页：K/D/全部三档 + 搜索 + 复制/上传（邮件/分享面板）+ 顶部跳转双按钮（「🔧 回抖音设置」dismiss 回原生 UI / 「🩺 医生设置」dlsym 直达 push；开关 `kDLPJumpButtonEnabled` 默认开，控制整行） |
+| DLPLogViewController | 实时日志主页：K/D/全部三档 + 搜索 + 复制/上传（邮件/分享面板）+ 顶部跳转双按钮（「🔧 回抖音设置」dismiss 回原生 UI / 「🩺 医生设置」dlsym 直达 push；常驻无开关） |
 | DLPLongPressEntry | 长按面板入口：hook `AWEModernLongPressPanelTableViewController -dataArray`，只加「查看日志」按钮数据（actionType=666、独立 group，不自建 UI）；点按钮先关面板（completion 里再进，避 P1），直达日志页 |
 
 ## 日志格式（AI 可读）
