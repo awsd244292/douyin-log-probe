@@ -20,6 +20,9 @@
 #define kDLPModuleCrashCatcher @"DLPModuleCrashCatcher"
 #define kDLPModuleBypassCatcher @"DLPModuleBypassCatcher" // 绕过登录专用捕捉器（默认开）
 
+// 长按面板入口（默认开）：视频长按菜单加「查看日志」按钮数据
+#define kDLPModuleLongPressEntry @"DLPModuleLongPressEntry"
+
 // 细节日志总闸（默认开：全量默认开；K 级关键日志常驻，D 级细节同步输出）
 #define kDLPDetailEnabled @"DLPDetailEnabled"
 
