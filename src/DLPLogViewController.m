@@ -8,16 +8,9 @@
 #import "DLPLogUploader.h"
 #import <dlfcn.h>
 
-// 可跳转的插件：symbol 是其 dylib 导出的设置入口 C 函数，dlsym 探测到才显示
-typedef struct {
-    const char *symbol;
-    const char *title;
-} DLPJumpTarget;
-static const DLPJumpTarget kDLPJumpTargets[] = {
-    { "showDYDSettingsVC", "抖音医生" },  // douyin-doctor（DYDSettingsPage.m）
-};
-static const NSUInteger kDLPJumpTargetCount =
-    sizeof(kDLPJumpTargets) / sizeof(kDLPJumpTargets[0]);
+// 跳转目标：用户自己的插件（douyin-doctor）导出的设置入口 C 函数。
+// dlsym 动态探测，零头文件依赖；未安装时按钮点不动（弹提示）。
+static const char *kDLPJumpSymbol = "showDYDSettingsVC";  // DYDSettingsPage.m
 
 @interface DLPLogViewController () <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
 @property(nonatomic, strong) UITableView *tableView;
@@ -57,9 +50,9 @@ static const NSUInteger kDLPJumpTargetCount =
     self.searchBar.placeholder = @"搜类名/事件/域，如 AWEUserService";
     self.searchBar.delegate = self;
 
-    // 插件跳转：主页显眼入口，查日志发现问题一键跳对应插件改设置
+    // 插件跳转：主页显眼入口，查日志发现问题一键跳抖音医生改设置
     UIButton *jumpBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [jumpBtn setTitle:@"🔧 跳转插件设置" forState:UIControlStateNormal];
+    [jumpBtn setTitle:@"🔧 抖音医生设置" forState:UIControlStateNormal];
     jumpBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [jumpBtn addTarget:self action:@selector(dlp_jumpPlugin)
       forControlEvents:UIControlEventTouchUpInside];
@@ -98,61 +91,24 @@ static const NSUInteger kDLPJumpTargetCount =
 - (void)dlp_clear { [DLPLogHub clearLogs]; [self dlp_reload]; }
 - (void)dlp_refilter { [self dlp_applyFilter]; }
 
-#pragma mark - 插件跳转
-
-/// dlsym 探测已安装的可跳转插件，返回 kDLPJumpTargets 下标
-- (NSArray<NSNumber *> *)dlp_detectedPlugins {
-    NSMutableArray<NSNumber *> *out = [NSMutableArray array];
-    for (NSUInteger i = 0; i < kDLPJumpTargetCount; i++) {
-        if (dlsym(RTLD_DEFAULT, kDLPJumpTargets[i].symbol)) {
-            [out addObject:@(i)];
-        }
-    }
-    return out;
-}
+#pragma mark - 插件跳转（只跳用户自己的插件：douyin-doctor）
 
 - (void)dlp_jumpPlugin {
-    NSArray<NSNumber *> *found = [self dlp_detectedPlugins];
-    if (found.count == 0) {
+    void *sym = dlsym(RTLD_DEFAULT, kDLPJumpSymbol);
+    if (!sym) {
         UIAlertController *alert =
             [UIAlertController alertControllerWithTitle:@"没探测到"
-                                               message:@"当前进程里没发现已安装的可跳转插件"
+                                               message:@"当前进程里没发现抖音医生（douyin-doctor）"
                                         preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
         [self presentViewController:alert animated:YES completion:nil];
         return;
     }
-    if (found.count == 1) {
-        [self dlp_openPlugin:(NSUInteger)[found[0] integerValue]];
-        return;
-    }
-    UIAlertController *sheet =
-        [UIAlertController alertControllerWithTitle:@"跳转到" message:nil
-                                    preferredStyle:UIAlertControllerStyleActionSheet];
-    for (NSNumber *n in found) {
-        NSUInteger i = (NSUInteger)[n integerValue];
-        NSString *title = [NSString stringWithUTF8String:kDLPJumpTargets[i].title];
-        [sheet addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault
-                                               handler:^(UIAlertAction *a) {
-            [self dlp_openPlugin:i];
-        }]];
-    }
-    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    sheet.popoverPresentationController.sourceView = self.view;
-    sheet.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, 0, 1, 1);
-    [self presentViewController:sheet animated:YES completion:nil];
-}
-
-/// 调目标插件的设置入口。本页已在导航栈里，对方 push 进来，返回键即回日志。
-- (void)dlp_openPlugin:(NSUInteger)idx {
-    if (idx >= kDLPJumpTargetCount) { return; }
-    void *sym = dlsym(RTLD_DEFAULT, kDLPJumpTargets[idx].symbol);
-    if (!sym) { return; }
     void (*openSettings)(UIViewController *) = (void (*)(UIViewController *))sym;
     @try {
+        // 本页已在导航栈里：对方设置页 push 进来，返回键即回日志
         openSettings(self);
-        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"%s",
-               kDLPJumpTargets[idx].title);
+        DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"douyin-doctor");
     } @catch (NSException *e) {
         DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpPlugin", @"fail=%@",
                e.reason ?: @"?");
