@@ -12,6 +12,22 @@
 // dlsym 动态探测，零头文件依赖；未安装时弹提示。
 static const char *kDLPDoctorSymbol = "showDYDSettingsVC";
 
+/// popover 锚点：iPad / 横屏 Regular 宽度下，actionSheet 与分享面板走
+/// UIPopoverPresentationController，不给有效锚点会在
+/// presentationTransitionWillBegin 抛 NSInvalidArgumentException 直接闪退
+///（v1.5.2 在用户横屏看视频时复现，SIGABRT）。
+/// 用 sourceView+sourceRect（导航栏右上角），确定性有效，不依赖 barButtonItem。
+static void DLPAnchorPopover(UIViewController *presented, UIViewController *srcVC) {
+    UIPopoverPresentationController *pop = presented.popoverPresentationController;
+    UIView *v = srcVC.view;
+    if (!pop || !v) { return; }
+    pop.sourceView = v;
+    CGFloat w = v.bounds.size.width;
+    if (w <= 0) { w = 390; }
+    pop.sourceRect = CGRectMake(w - 44, 0, 44, 44);
+    pop.permittedArrowDirections = UIPopoverArrowDirectionUp;
+}
+
 @interface DLPLogViewController () <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
 @property(nonatomic, strong) UITableView *tableView;
 @property(nonatomic, strong) UISearchBar *searchBar;
@@ -166,8 +182,8 @@ static const char *kDLPDoctorSymbol = "showDYDSettingsVC";
         [self dlp_share];
     }]];
     [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    // iPad 弹出位置（iPhone 上无影响）
-    sheet.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItems.firstObject;
+    // popover 锚点（iPad/横屏不设会闪退，见 DLPAnchorPopover）
+    DLPAnchorPopover(sheet, self);
     [self presentViewController:sheet animated:YES completion:nil];
 }
 
@@ -192,7 +208,8 @@ static const char *kDLPDoctorSymbol = "showDYDSettingsVC";
     UIActivityViewController *av =
         [[UIActivityViewController alloc] initWithActivityItems:@[[NSURL fileURLWithPath:tmp]]
                                         applicationActivities:nil];
-    av.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItems.firstObject;
+    // popover 锚点（iPad/横屏不设会闪退，见 DLPAnchorPopover）
+    DLPAnchorPopover(av, self);
     [self presentViewController:av animated:YES completion:nil];
     DLPLog(@"net", YES, @"DLPLogViewController", @"share", @"lines=%ld", (long)cap);
 }
