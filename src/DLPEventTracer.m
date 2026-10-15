@@ -295,6 +295,14 @@ static BOOL dlp_fmRemove(id self, SEL _cmd, id path, id *error) {
 
 #pragma mark - 装配
 
+/// 标量参数 hook 的安全安装：签名对不上就跳过并记日志（K 级），宁可少抓一条也不崩
+static void DLPInstallCheckedOrSkip(DLPHookSlot *slot, const char *clsName, SEL sel, IMP imp, char argType) {
+    if (!DLPHookInstallChecked(slot, clsName, sel, imp, NO, argType)) {
+        DLPLog(@"sys", YES, @"DLPEventTracer", @"skip", @"%s.%@ sig!=%c",
+               clsName, NSStringFromSelector(sel), argType);
+    }
+}
+
 @implementation DLPEventTracer
 
 + (void)install {
@@ -310,16 +318,16 @@ static BOOL dlp_fmRemove(id self, SEL _cmd, id path, id *error) {
     // AVPlayer（CrashLogger 同款 6 方法）
     DLPHookInstall(&s_avPlay, "AVPlayer", @selector(play), (IMP)dlp_avPlay, NO);
     DLPHookInstall(&s_avPause, "AVPlayer", @selector(pause), (IMP)dlp_avPause, NO);
-    DLPHookInstall(&s_avRate, "AVPlayer", @selector(setRate:), (IMP)dlp_avSetRate, NO);
+    DLPInstallCheckedOrSkip(&s_avRate, "AVPlayer", @selector(setRate:), (IMP)dlp_avSetRate, 'f');
     DLPHookInstall(&s_avReplace, "AVPlayer", @selector(replaceCurrentItemWithPlayerItem:), (IMP)dlp_avReplace, NO);
     DLPHookInstall(&s_avInitItem, "AVPlayer", @selector(initWithPlayerItem:), (IMP)dlp_avInitItem, NO);
     DLPHookInstall(&s_avInitURL, "AVPlayer", @selector(initWithURL:), (IMP)dlp_avInitURL, NO);
-    // TTVideoEngine（K=play/pause）
+    // TTVideoEngine（K=play/pause；标量参数走签名校验）
     DLPHookInstall(&s_tvePlay, "TTVideoEngine", @selector(play), (IMP)dlp_tvePlay, NO);
     DLPHookInstall(&s_tvePause, "TTVideoEngine", @selector(pause), (IMP)dlp_tvePause, NO);
-    DLPHookInstall(&s_tveSeek, "TTVideoEngine", @selector(setCurrentPlaybackTime:), (IMP)dlp_tveSeek, NO);
-    DLPHookInstall(&s_tveSpeed, "TTVideoEngine", @selector(setPlaybackSpeed:), (IMP)dlp_tveSpeed, NO);
-    DLPHookInstall(&s_tveScale, "TTVideoEngine", @selector(setImageScaleType:), (IMP)dlp_tveScale, NO);
+    DLPInstallCheckedOrSkip(&s_tveSeek, "TTVideoEngine", @selector(setCurrentPlaybackTime:), (IMP)dlp_tveSeek, 'd');
+    DLPInstallCheckedOrSkip(&s_tveSpeed, "TTVideoEngine", @selector(setPlaybackSpeed:), (IMP)dlp_tveSpeed, 'f');
+    DLPInstallCheckedOrSkip(&s_tveScale, "TTVideoEngine", @selector(setImageScaleType:), (IMP)dlp_tveScale, 'q');
     // 登录监听（DYYY 2.3-0 的 2 个点，K）
     DLPHookInstall(&s_loginListener, "AWEUserServiceListener", @selector(didFinishLoginWithUid:), (IMP)dlp_loginListener, NO);
     DLPHookInstall(&s_loginBroadcast, "TTAccountMulticast", @selector(broadcastLoginSuccess:platform:reason:), (IMP)dlp_loginBroadcast, NO);

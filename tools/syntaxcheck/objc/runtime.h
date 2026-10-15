@@ -33,6 +33,9 @@ const char *class_getImageName(Class cls);
 IMP method_getImplementation(Method m);
 IMP method_setImplementation(Method m, IMP imp);
 const char *method_getTypeEncoding(Method m);
+// DLP 补：参数签名校验用（真机 SDK 有）
+unsigned int method_getNumberOfArguments(Method m);
+void method_getArgumentType(Method m, unsigned int index, char *dst, size_t dst_len);
 Class object_getClass(id obj);
 
 // 属性元数据（V3.0 元属性清洗用）

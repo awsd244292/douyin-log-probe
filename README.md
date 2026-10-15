@@ -41,6 +41,7 @@
 - 类名全部 `NSClassFromString` 动态解析，不存在 → 静默跳过
 - 幂等安装；卸载时比对当前 IMP 仍是 hook 才还原
 - 参数读取规则：无参/公开 API 可读参数；私有**多参方法只记类名+selector**（如 `broadcastLoginSuccess:platform:reason:`），防调用约定踩雷
+- 标量参数 hook（`setRate:`/`setCurrentPlaybackTime:`/`setPlaybackSpeed:`/`setImageScaleType:`）走 `DLPHookInstallChecked`：运行时校验参数类型编码，对不上就跳过安装并记 K 级日志，宁可少抓一条也不崩
 
 ## 已知局限（诚实边界）
 

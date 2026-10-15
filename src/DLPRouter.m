@@ -45,3 +45,23 @@ void DLPHookRemove(DLPHookSlot *slot) {
     slot->orig = NULL;
     slot->hook = NULL;
 }
+
+BOOL DLPHookInstallChecked(DLPHookSlot *slot, const char *className, SEL sel, IMP newIMP,
+                           BOOL isClassMethod, char expectedArgType) {
+    if (!slot || !className || !sel) { return NO; }
+    @try {
+        Class cls = objc_getClass(className);
+        if (!cls) { return NO; }
+        if (isClassMethod) { cls = object_getClass(cls); if (!cls) { return NO; } }
+        Method m = class_getInstanceMethod(cls, sel);
+        if (!m) { return NO; }
+        // 必须恰好 3 个参数 (self, _cmd, arg)，且第 1 个实参类型匹配
+        if (method_getNumberOfArguments(m) != 3) { return NO; }
+        char buf[16] = {0};
+        method_getArgumentType(m, 2, buf, sizeof(buf));
+        if (buf[0] != expectedArgType) { return NO; }
+    } @catch (NSException *e) {
+        return NO;
+    }
+    return DLPHookInstall(slot, className, sel, newIMP, isClassMethod);
+}

@@ -26,6 +26,12 @@ typedef struct {
 /// 成功返回 YES，slot->orig 为原 IMP。
 BOOL DLPHookInstall(DLPHookSlot *slot, const char *className, SEL sel, IMP newIMP, BOOL isClassMethod);
 
+/// 带参数签名校验的安装：先确认目标方法的第 1 个实参类型编码首字符 == expectedArgType
+/// （如 'f'=float、'd'=double、'q'=long），对不上则跳过安装并返回 NO。
+/// 用于标量参数类型拿不准的私有方法（猜错调用约定会崩），宁可少抓一条。
+BOOL DLPHookInstallChecked(DLPHookSlot *slot, const char *className, SEL sel, IMP newIMP,
+                           BOOL isClassMethod, char expectedArgType);
+
 /// 卸载 hook：仅当 slot 已安装且当前 IMP 仍是 hook 时才还原。
 /// 还原后 slot->installed = NO。
 void DLPHookRemove(DLPHookSlot *slot);
