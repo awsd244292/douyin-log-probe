@@ -79,8 +79,51 @@
 - (void)dlp_clear { [DLPLogHub clearLogs]; [self dlp_reload]; }
 - (void)dlp_refilter { [self dlp_applyFilter]; }
 
-/// 上传：调系统邮件把日志+类名地图发到用户 Gmail，助手用 Gmail 连接器直接读
-- (void)dlp_upload { [DLPLogUploader presentMailComposerFrom:self]; }
+/// 上传：二级选单——邮件发送 / 分享面板（可分享进 Muse App）
+- (void)dlp_upload {
+    UIAlertController *sheet =
+        [UIAlertController alertControllerWithTitle:@"上传日志"
+                                           message:nil
+                                    preferredStyle:UIAlertControllerStyleActionSheet];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"邮件发送" style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *a) {
+        [DLPLogUploader presentMailComposerFrom:self];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"分享面板" style:UIAlertActionStyleDefault
+                                           handler:^(UIAlertAction *a) {
+        [self dlp_share];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    // iPad 弹出位置（iPhone 上无影响）
+    sheet.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItems.firstObject;
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+/// 分享面板：把日志写成临时 .log 文件交出去（可进 Muse 分享扩展）
+- (void)dlp_share {
+    NSArray<NSString *> *lines = [DLPLogHub allLogs] ?: @[];
+    NSMutableString *buf = [NSMutableString string];
+    NSInteger cap = MIN((NSInteger)lines.count, 2000);
+    for (NSInteger i = cap - 1; i >= 0; i--) {
+        NSString *l = lines[(NSUInteger)i];
+        if (buf.length + l.length > 200 * 1024) { break; }
+        [buf appendString:l];
+        [buf appendString:@"\n"];
+    }
+    NSString *tmp = [NSTemporaryDirectory() stringByAppendingPathComponent:@"dlp.log"];
+    NSError *err = nil;
+    [buf writeToFile:tmp atomically:YES encoding:NSUTF8StringEncoding error:&err];
+    if (err) {
+        DLPLog(@"net", YES, @"DLPLogViewController", @"share", @"write tmp fail");
+        return;
+    }
+    UIActivityViewController *av =
+        [[UIActivityViewController alloc] initWithActivityItems:@[[NSURL fileURLWithPath:tmp]]
+                                        applicationActivities:nil];
+    av.popoverPresentationController.barButtonItem = self.navigationItem.rightBarButtonItems.firstObject;
+    [self presentViewController:av animated:YES completion:nil];
+    DLPLog(@"net", YES, @"DLPLogViewController", @"share", @"lines=%ld", (long)cap);
+}
 
 /// 复制当前筛选结果到剪贴板（时间正序，最多 2000 行 / 200KB），直接粘贴发出来即可
 - (void)dlp_copy {
