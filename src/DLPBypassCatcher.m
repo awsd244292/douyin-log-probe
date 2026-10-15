@@ -43,7 +43,11 @@ static void DLPBPollOnce(void) {
             service = [svcCls performSelector:@selector(sharedService)];
         }
         if ([service respondsToSelector:@selector(isLogin)]) {
-            official = [[service performSelector:@selector(isLogin)] boolValue];
+            // isLogin 返回 BOOL，不能用 performSelector（它按 id 解释返回值，
+            // YES=1 会被当成 0x1 对象指针，后面 boolValue 直接崩）。
+            // 用 objc_msgSend 直调并按 BOOL 签名取返回值。
+            BOOL (*msgSendBool)(id, SEL) = (BOOL (*)(id, SEL))objc_msgSend;
+            official = msgSendBool(service, @selector(isLogin));
         }
         if ([service respondsToSelector:@selector(userID)]) {
             id u = [service performSelector:@selector(userID)];
