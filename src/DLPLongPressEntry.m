@@ -58,53 +58,6 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
     NSArray *(*orig)(id, SEL) = (NSArray *(*)(id, SEL))slot->orig;
     NSArray *original = orig ? orig(self, _cmd) : @[];
     if (!original) { original = @[]; }
-    // 诊断（1.5.9）：dump 原生组结构，看 groupType 分布 + 原生 viewModel 样例
-    if (callNo == 1) {
-        NSMutableArray *types = [NSMutableArray array];
-        for (id g in original) {
-            id gt = nil;
-            @try { gt = [g valueForKey:@"groupType"]; } @catch (NSException *e) {}
-            [types addObject:gt ?: @"nil"];
-        }
-        DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
-               @"原生组结构 count=%lu groupType=[%@]",
-               (unsigned long)original.count, [types componentsJoinedByString:@","]);
-        id firstVM = nil;
-        @try {
-            NSArray *arr = [original.firstObject valueForKey:@"groupArr"];
-            firstVM = arr.firstObject;
-        } @catch (NSException *e) {}
-        if (firstVM) {
-            id at = nil, icon = nil, desc = nil;
-            @try { at = [firstVM valueForKey:@"actionType"]; } @catch (NSException *e) {}
-            @try { icon = [firstVM valueForKey:@"duxIconName"]; } @catch (NSException *e) {}
-            @try { desc = [firstVM valueForKey:@"describeString"]; } @catch (NSException *e) {}
-            DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
-                   @"原生vm样例 actionType=%@ icon=%@ desc=%@",
-                   at ?: @"nil", icon ?: @"nil", desc ?: @"nil");
-        }
-    }
-    // 诊断（1.5.10）：runtime 扒原生组/viewModel 的全部属性名，确认 39.7.0 的 key 名
-    // 诊断（1.5.11）：dump 原生组各属性的具体值，照抄一份
-    if (callNo == 1 && original.count > 0) {
-        id g0 = original.firstObject;
-        unsigned int pc = 0;
-        objc_property_t *props = class_copyPropertyList([g0 class], &pc);
-        NSMutableArray *vals = [NSMutableArray array];
-        for (unsigned int i = 0; i < pc && i < 30; i++) {
-            NSString *pn = @(property_getName(props[i]));
-            id v = nil;
-            @try { v = [g0 valueForKey:pn]; } @catch (NSException *e) {}
-            NSString *vs = nil;
-            if (!v) vs = @"nil";
-            else if ([v isKindOfClass:[NSArray class]]) vs = [NSString stringWithFormat:@"arr(%lu)", (unsigned long)[(NSArray *)v count]];
-            else vs = [NSString stringWithFormat:@"%@", v];
-            [vals addObject:[NSString stringWithFormat:@"%@=%@", pn, vs]];
-        }
-        if (props) free(props);
-        DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
-               @"原生组值 [%@]", [vals componentsJoinedByString:@", "]);
-    }
     // 开关：默认开，不用可关
     if (!DLPGetBoolDef(kDLPModuleLongPressEntry, YES)) {
         if (callNo <= 3) {
@@ -166,14 +119,13 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
             go(); // 兜底：manager 拿不到就直接进
         } copy] forKey:@"action"];
 
+        // 组装：照抄 DYYY 旧版类路径（39.7.0 实测有效）——groupType=0、插首位、
+        // 不设 isModern / numberOfRowsInSection（DYYY 也不设）
         id group = [[groupCls alloc] init];
-        [group setValue:@(11) forKey:@"groupType"];
-        [group setValue:@(YES) forKey:@"isModern"];
+        [group setValue:@(0) forKey:@"groupType"];
         [group setValue:@[vm] forKey:@"groupArr"];
-        // 39.7.0 面板用 numberOfRowsInSection 决定行数（1.5.10 发现），不设则 0 行不可见
-        [group setValue:@(1) forKey:@"numberOfRowsInSection"];
         NSMutableArray *result = [original mutableCopy];
-        [result addObject:group];
+        [result insertObject:group atIndex:0];
         if (callNo <= 3) {
             DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
                    @"已注入「查看日志」 原组数=%lu", (unsigned long)original.count);
