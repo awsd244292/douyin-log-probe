@@ -84,6 +84,43 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
                    at ?: @"nil", icon ?: @"nil", desc ?: @"nil");
         }
     }
+    // 诊断（1.5.10）：runtime 扒原生组/viewModel 的全部属性名，确认 39.7.0 的 key 名
+    if (callNo == 1 && original.count > 0) {
+        id g0 = original.firstObject;
+        unsigned int pc = 0;
+        objc_property_t *props = class_copyPropertyList([g0 class], &pc);
+        NSMutableArray *pnames = [NSMutableArray array];
+        for (unsigned int i = 0; i < pc && i < 30; i++) {
+            [pnames addObject:@(property_getName(props[i]))];
+        }
+        DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
+               @"原生组属性=[%@]", [pnames componentsJoinedByString:@","]);
+        // 找组里第一个非空数组属性，取其首元素当 viewModel 样例
+        id sampleVM = nil;
+        for (unsigned int i = 0; i < pc && !sampleVM; i++) {
+            @try {
+                id v = [g0 valueForKey:@(property_getName(props[i]))];
+                if ([v isKindOfClass:[NSArray class]] && [(NSArray *)v count] > 0) {
+                    sampleVM = [(NSArray *)v firstObject];
+                }
+            } @catch (NSException *e) {}
+        }
+        if (props) free(props);
+        if (sampleVM) {
+            unsigned int vc = 0;
+            objc_property_t *vprops = class_copyPropertyList([sampleVM class], &vc);
+            NSMutableArray *vnames = [NSMutableArray array];
+            for (unsigned int i = 0; i < vc && i < 40; i++) {
+                [vnames addObject:@(property_getName(vprops[i]))];
+            }
+            if (vprops) free(vprops);
+            DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
+                   @"原生vm类=%@ 属性=[%@]", NSStringFromClass([sampleVM class]),
+                   [vnames componentsJoinedByString:@","]);
+        } else {
+            DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray", @"原生组内无非空数组属性");
+        }
+    }
     // 开关：默认开，不用可关
     if (!DLPGetBoolDef(kDLPModuleLongPressEntry, YES)) {
         if (callNo <= 3) {
