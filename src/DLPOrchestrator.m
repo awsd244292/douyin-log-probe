@@ -94,7 +94,7 @@ static void DLPRemoveStderrCapture(void) {
         else { DLPRemoveStderrCapture(); }
         [DLPSettings install]; // 设置页入口常驻（CrashLogger 同款：无卸载）
         [DLPLogHub cleanupOldLogs];
-        DLPLog(@"sys", YES, @"DLPOrchestrator", @"applyCurrentProfile", @"enabled");
+        DLPLog(@"sys", YES, @"DLPOrchestrator", @"applyCurrentProfile", @"enabled v%@", DLP_VERSION);
     }
 }
 
