@@ -1,0 +1,66 @@
+# DouyinLogProbe 交接文档
+
+> 抖音 iOS 日志抓捕插件。独立仓库，与 douyin-doctor 分开安装、分开维护。
+> 最后更新：2026-10-16，版本 v1.5.19-beta
+
+## 一句话
+
+给没有电脑、抓不到设备日志的用户，在抖音 App 内直接看日志、搜日志、导日志的探针。
+
+## 架构
+
+```
+DLPEntry (constructor 入口)
+  └─ DLPOrchestrator.applyCurrentProfile  ← 总控，按开关装/卸各模块
+       ├─ DLPLogHub          日志中心（内存环形 2000 行 + 落盘 Documents/DLPLogs/）
+       ├─ DLPClassProbe      类名探针（后台枚举全量类 → classmap.json）
+       ├─ DLPEventTracer     事件追踪（页面/网络/播放器/登录/数据落盘）
+       ├─ DLPPerfProbe       性能（FPS/内存/主线程卡顿）
+       ├─ DLPCrashCatcher    崩溃（12 信号 + 未捕获异常）
+       ├─ DLPBypassCatcher   绕过登录诊断（开关翻转/官方真相/弹窗时间线）
+       ├─ DLPLongPressEntry  长按面板「查看日志」入口（无登录时的唯一入口）
+       ├─ DLPStderrCapture   stderr 重定向收其他插件日志（真机不可靠，已半弃用）
+       └─ DLPSettings        原生设置页注入「日志探针」总入口行
+```
+
+UI（纯 UIKit，不依赖抖音设置页类，未登录可用）：
+- `DLPLogViewController` — 实时日志页（搜索/过滤/复制/上传/清空）
+- `DLPSettingsViewController` — 独立设置页（总开关/模块/日志/操作四组）
+- `DLPSettingsHelper` — 设置项工厂（对齐医生 DYDSettingsHelper 的接口，纯 UIKit 实现）
+
+## 关键入口
+
+| 入口 | 位置 | 说明 |
+|---|---|---|
+| 原生设置页「日志探针」 | DLPSettings.m `dlp_sectionDataArray` | 只在主设置页（有「账号」分区）插一行，tap 后 push 独立设置页 |
+| 长按「查看日志」 | DLPLongPressEntry.m | hook 三类面板的 `dataArray`，39.7.0 用旧版类组装（groupType=0 插首位，照抄 DYYY） |
+| 日志页顶部按钮 | DLPLogViewController.m | 🔧回抖音设置 / 🩺医生设置 / 📥拉医生日志 / ⚙️探针设置 |
+
+## 与 douyin-doctor 的联动
+
+- `DLPDoctorBridge`：`NSClassFromString(@"DYDLogManager")` 直调 `+allLogs`，把医生的日志环形缓冲拉进探针（替代不可靠的 stderr 通道）。日志页「📥 拉医生日志」按钮触发。
+- 「🩺 医生设置」按钮：dlsym `showDYDOwnSettingsVC`（医生 1.1.8+ 新导出），找不到回退 `showDYDSettingsVC`。
+- 两个插件分开安装、分开发包，联调时两边版本要对上。
+
+## 已知坑
+
+1. **总开关 OFF 自锁**（v1.5.19 修）：`applyCurrentProfile` 在 OFF 时直接 return，`[DLPSettings install]` 没执行 → 重启后设置入口消失。修法：install 永远在 enabled 检查前执行。
+2. **stderr 收其他插件日志真机 0 条**：`pipe()`+`dup2()` 在真机上抓不到 NSLog，原因未深究。改走 `DLPDoctorBridge` 直读。
+3. **长按面板组装**（v1.5.12 修）：39.7.0 旧版 `AWELongPressPanelTableViewController` 只认 `groupType=0`+插首位+DYYY 式单组；之前用 11/12+append 不显示。
+4. **`server/.token` 曾误提交到公开仓**（已删）：日志接收服务的鉴权 token，2026-10-16 从 git 历史可见，已作废。`.gitignore` 已加。
+
+## 构建
+
+```bash
+bash tools/syntaxcheck.sh   # 16 文件全过才继续
+bash tools/build_dylib.sh   # 产物 build/DouyinLogProbe.dylib（arm64，未签名）
+```
+
+- 本地只能编 arm64（LLVM 无 ptrauth），正式发布走 CI。
+- 版本号规则：测试包自动递增，统一 `-beta` 后缀；`DLP_VERSION` 要同步改，启动日志和二进制可查。
+- 出包不 push，push 不出包，用户说"推"才 push。
+
+## 日志格式
+
+`timestamp|K|domain|class|event|detail`，例如：
+`1792115535|K|sys|DLPLongPressEntry|openLogViewer|fromLongPress`
