@@ -85,41 +85,25 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
         }
     }
     // 诊断（1.5.10）：runtime 扒原生组/viewModel 的全部属性名，确认 39.7.0 的 key 名
+    // 诊断（1.5.11）：dump 原生组各属性的具体值，照抄一份
     if (callNo == 1 && original.count > 0) {
         id g0 = original.firstObject;
         unsigned int pc = 0;
         objc_property_t *props = class_copyPropertyList([g0 class], &pc);
-        NSMutableArray *pnames = [NSMutableArray array];
+        NSMutableArray *vals = [NSMutableArray array];
         for (unsigned int i = 0; i < pc && i < 30; i++) {
-            [pnames addObject:@(property_getName(props[i]))];
-        }
-        DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
-               @"原生组属性=[%@]", [pnames componentsJoinedByString:@","]);
-        // 找组里第一个非空数组属性，取其首元素当 viewModel 样例
-        id sampleVM = nil;
-        for (unsigned int i = 0; i < pc && !sampleVM; i++) {
-            @try {
-                id v = [g0 valueForKey:@(property_getName(props[i]))];
-                if ([v isKindOfClass:[NSArray class]] && [(NSArray *)v count] > 0) {
-                    sampleVM = [(NSArray *)v firstObject];
-                }
-            } @catch (NSException *e) {}
+            NSString *pn = @(property_getName(props[i]));
+            id v = nil;
+            @try { v = [g0 valueForKey:pn]; } @catch (NSException *e) {}
+            NSString *vs = nil;
+            if (!v) vs = @"nil";
+            else if ([v isKindOfClass:[NSArray class]]) vs = [NSString stringWithFormat:@"arr(%lu)", (unsigned long)[(NSArray *)v count]];
+            else vs = [NSString stringWithFormat:@"%@", v];
+            [vals addObject:[NSString stringWithFormat:@"%@=%@", pn, vs]];
         }
         if (props) free(props);
-        if (sampleVM) {
-            unsigned int vc = 0;
-            objc_property_t *vprops = class_copyPropertyList([sampleVM class], &vc);
-            NSMutableArray *vnames = [NSMutableArray array];
-            for (unsigned int i = 0; i < vc && i < 40; i++) {
-                [vnames addObject:@(property_getName(vprops[i]))];
-            }
-            if (vprops) free(vprops);
-            DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
-                   @"原生vm类=%@ 属性=[%@]", NSStringFromClass([sampleVM class]),
-                   [vnames componentsJoinedByString:@","]);
-        } else {
-            DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray", @"原生组内无非空数组属性");
-        }
+        DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
+               @"原生组值 [%@]", [vals componentsJoinedByString:@", "]);
     }
     // 开关：默认开，不用可关
     if (!DLPGetBoolDef(kDLPModuleLongPressEntry, YES)) {
@@ -186,6 +170,8 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
         [group setValue:@(11) forKey:@"groupType"];
         [group setValue:@(YES) forKey:@"isModern"];
         [group setValue:@[vm] forKey:@"groupArr"];
+        // 39.7.0 面板用 numberOfRowsInSection 决定行数（1.5.10 发现），不设则 0 行不可见
+        [group setValue:@(1) forKey:@"numberOfRowsInSection"];
         NSMutableArray *result = [original mutableCopy];
         [result addObject:group];
         if (callNo <= 3) {
