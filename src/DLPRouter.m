@@ -4,18 +4,46 @@
 //
 
 #import "DLPRouter.h"
+#import "DLPLogHub.h"
+
+// 失败原因枚举（1.5.20 诊断增强：hook 装不上必须留痕，否则真机现象无从定位）
+// 注意：这里用 K 级日志，且 DLPLog 在总开关 OFF 时会静默——
+// 但本函数会在总开关 OFF 时也尝试安装入口 hook（见 DLPOrchestrator），
+// 因此额外用 NSLog 兜一路（NSLog 不受 DLP 自己的总开关影响）。
+static void DLPReportHookFailure(const char *className, SEL sel, const char *reason) {
+    NSLog(@"[DLP] HOOK_FAIL %s %@ : %s", className ?: "?",
+          sel ? NSStringFromSelector(sel) : @"(null)", reason ?: "?");
+    DLPLog(@"sys", YES, @"DLPRouter", @"hookFail", @"%s %@ %s",
+           className ?: "?", sel ? NSStringFromSelector(sel) : @"(null)", reason ?: "?");
+}
 
 BOOL DLPHookInstall(DLPHookSlot *slot, const char *className, SEL sel, IMP newIMP, BOOL isClassMethod) {
-    if (!slot || !className || !sel || !newIMP) { return NO; }
+    if (!slot || !className || !sel || !newIMP) {
+        DLPReportHookFailure(className, sel, "入参非法(slot/sel/newIMP 为空)");
+        return NO;
+    }
     if (slot->installed) { return YES; } // 幂等
     @try {
         Class cls = objc_getClass(className);
-        if (!cls) { return NO; }
+        if (!cls) {
+            DLPReportHookFailure(className, sel, "类不存在（宿主版本无此类）");
+            return NO;
+        }
         if (isClassMethod) { cls = object_getClass(cls); if (!cls) { return NO; } }
         Method m = class_getInstanceMethod(cls, sel);
-        if (!m) { return NO; }
+        if (!m) {
+            DLPReportHookFailure(className, sel, "方法不存在（宿主版本无此 selector）");
+            return NO;
+        }
         IMP orig = method_getImplementation(m);
-        if (!orig || orig == newIMP) { return NO; }
+        if (!orig) {
+            DLPReportHookFailure(className, sel, "原 IMP 为空");
+            return NO;
+        }
+        if (orig == newIMP) {
+            // 已经是我们的实现（重复安装或他人已替换成同一个），不算失败
+            return NO;
+        }
         method_setImplementation(m, newIMP);
         slot->cls = cls;
         slot->sel = sel;
@@ -25,6 +53,7 @@ BOOL DLPHookInstall(DLPHookSlot *slot, const char *className, SEL sel, IMP newIM
         slot->isClassMethod = isClassMethod;
         return YES;
     } @catch (NSException *e) {
+        DLPReportHookFailure(className, sel, "异常");
         return NO;
     }
 }

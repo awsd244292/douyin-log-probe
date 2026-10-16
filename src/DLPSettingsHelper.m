@@ -80,17 +80,44 @@
     [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:^(UIAlertAction *a) {
         if (onCancel) { onCancel(); }
     }]];
-    // 找顶层 VC present
+    // 找顶层 VC present（1.5.20 修正：与 DLPSettings.m 的 DLPTopViewController 保持同一套逻辑）
+    // 此前取「第一个有 rootViewController 的 window」，但 iOS 13+ 抖音会同时存在多个
+    // window（主窗/悬浮/弹窗层），第一个未必是 keyWindow → 可能 present 到不可见那一层。
+    // 改为：优先 keyWindow，其次第一个可见 window，最后兜底第一个有 rootVC 的。
     UIViewController *top = nil;
     @try {
         id app = [UIApplication performSelector:@selector(sharedApplication)];
-        for (id window in [app valueForKey:@"windows"]) {
-            id root = [window valueForKey:@"rootViewController"];
-            if (root) { top = root; break; }
+        NSArray *windows = [app valueForKey:@"windows"];
+        id keyWin = nil;
+        @try { keyWin = [app valueForKey:@"keyWindow"]; } @catch (NSException *e) {}
+        if (keyWin) {
+            id root = [keyWin valueForKey:@"rootViewController"];
+            if (root) { top = root; }
+        }
+        if (!top) {
+            for (id window in windows) {
+                id root = [window valueForKey:@"rootViewController"];
+                if (!root) { continue; }
+                BOOL hidden = NO;
+                @try { hidden = [[window valueForKey:@"hidden"] boolValue]; } @catch (NSException *e) {}
+                if (hidden) { continue; }
+                top = root; break;
+            }
+        }
+        if (!top) {  // 兜底：不挑可见性
+            for (id window in windows) {
+                id root = [window valueForKey:@"rootViewController"];
+                if (root) { top = root; break; }
+            }
         }
         while (top.presentedViewController) { top = top.presentedViewController; }
     } @catch (NSException *e) {}
-    if (top) { [top presentViewController:alert animated:YES completion:nil]; }
+    if (top) {
+        [top presentViewController:alert animated:YES completion:nil];
+    } else {
+        // 取不到顶层 VC = 弹窗必然不出现，必须留痕（NSLog 不受 DLP 总开关约束）
+        NSLog(@"[DLP] showTextInputAlert 失败：取不到顶层 VC，弹窗未显示");
+    }
 }
 
 + (BOOL)getBool:(NSString *)key default:(BOOL)def {
