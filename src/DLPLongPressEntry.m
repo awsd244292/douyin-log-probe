@@ -58,6 +58,32 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
     NSArray *(*orig)(id, SEL) = (NSArray *(*)(id, SEL))slot->orig;
     NSArray *original = orig ? orig(self, _cmd) : @[];
     if (!original) { original = @[]; }
+    // 诊断（1.5.9）：dump 原生组结构，看 groupType 分布 + 原生 viewModel 样例
+    if (callNo == 1) {
+        NSMutableArray *types = [NSMutableArray array];
+        for (id g in original) {
+            id gt = nil;
+            @try { gt = [g valueForKey:@"groupType"]; } @catch (NSException *e) {}
+            [types addObject:gt ?: @"nil"];
+        }
+        DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
+               @"原生组结构 count=%lu groupType=[%@]",
+               (unsigned long)original.count, [types componentsJoinedByString:@","]);
+        id firstVM = nil;
+        @try {
+            NSArray *arr = [original.firstObject valueForKey:@"groupArr"];
+            firstVM = arr.firstObject;
+        } @catch (NSException *e) {}
+        if (firstVM) {
+            id at = nil, icon = nil, desc = nil;
+            @try { at = [firstVM valueForKey:@"actionType"]; } @catch (NSException *e) {}
+            @try { icon = [firstVM valueForKey:@"duxIconName"]; } @catch (NSException *e) {}
+            @try { desc = [firstVM valueForKey:@"describeString"]; } @catch (NSException *e) {}
+            DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
+                   @"原生vm样例 actionType=%@ icon=%@ desc=%@",
+                   at ?: @"nil", icon ?: @"nil", desc ?: @"nil");
+        }
+    }
     // 开关：默认开，不用可关
     if (!DLPGetBoolDef(kDLPModuleLongPressEntry, YES)) {
         if (callNo <= 3) {
