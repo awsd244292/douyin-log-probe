@@ -7,6 +7,7 @@
 #import "DLPLogHub.h"
 #import "DLPLogUploader.h"
 #import "DLPDoctorBridge.h"
+#import "DLPSettingsViewController.h"
 #import <dlfcn.h>
 
 // 直达医生设置：douyin-doctor 导出的设置入口 C 函数（DYDSettingsPage.m），
@@ -86,7 +87,12 @@ static void DLPAnchorPopover(UIViewController *presented, UIViewController *srcV
     pullBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [pullBtn addTarget:self action:@selector(dlp_pullDoctorLogs)
       forControlEvents:UIControlEventTouchUpInside];
-    UIStackView *jumpRow = [[UIStackView alloc] initWithArrangedSubviews:@[backBtn, docBtn, pullBtn]];
+    UIButton *settingsBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [settingsBtn setTitle:@"⚙️ 探针设置" forState:UIControlStateNormal];
+    settingsBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [settingsBtn addTarget:self action:@selector(dlp_openSettings)
+      forControlEvents:UIControlEventTouchUpInside];
+    UIStackView *jumpRow = [[UIStackView alloc] initWithArrangedSubviews:@[backBtn, docBtn, pullBtn, settingsBtn]];
     jumpRow.axis = UILayoutConstraintAxisHorizontal;
     jumpRow.distribution = UIStackViewDistributionFillEqually;
     self.jumpRow = jumpRow;
@@ -198,6 +204,14 @@ static void DLPAnchorPopover(UIViewController *presented, UIViewController *srcV
     DLPLog(@"sys", YES, @"DLPLogViewController", @"pullDoctorLogs", @"ok n=%lu",
            (unsigned long)lines.count);
     [self dlp_reload];
+}
+
+/// 4. 探针独立设置页：开关收拢，不散落在原生设置里
+- (void)dlp_openSettings {
+    DLPSettingsViewController *vc =
+        [[DLPSettingsViewController alloc] initWithStyle:UITableViewStyleGrouped];
+    [self.navigationController pushViewController:vc animated:YES];
+    DLPLog(@"sys", YES, @"DLPLogViewController", @"openSettings", @"ok");
 }
 
 /// 上传：二级选单——邮件发送 / 分享面板（可分享进 Muse App）

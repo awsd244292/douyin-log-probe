@@ -379,6 +379,11 @@ static const UILayoutPriority UILayoutPriorityRequired    = 1000;
 - (void)dismissViewControllerAnimated:(BOOL)flag completion:(void (^)(void))completion;
 @end
 
+@interface UITableViewController : UIViewController
+@property (nonatomic, strong) UITableView *tableView;
+- (instancetype)initWithStyle:(UITableViewStyle)style;
+@end
+
 @interface UINavigationController : UIViewController
 - (instancetype)initWithRootViewController:(UIViewController *)root;
 - (void)pushViewController:(UIViewController *)vc animated:(BOOL)animated;
