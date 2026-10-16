@@ -74,6 +74,8 @@ static void DLPRemoveStderrCapture(void) {
 + (void)applyCurrentProfile {
     @synchronized(self) {
         BOOL enabled = DLPGetBoolDef(kDLPEnabled, YES);
+        // 设置入口永远常驻（即使总开关 OFF 也要能进设置再打开，否则自锁）
+        [DLPSettings install];
         if (!enabled) {
             [self shutdownAll];
             return;
@@ -92,7 +94,6 @@ static void DLPRemoveStderrCapture(void) {
         else { [DLPLongPressEntry uninstall]; }
         if (DLPGetBoolDef(kDLPStderrCapture, YES)) { DLPInstallStderrCapture(); }
         else { DLPRemoveStderrCapture(); }
-        [DLPSettings install]; // 设置页入口常驻（CrashLogger 同款：无卸载）
         [DLPLogHub cleanupOldLogs];
         DLPLog(@"sys", YES, @"DLPOrchestrator", @"applyCurrentProfile", @"enabled v%@", DLP_VERSION);
     }
