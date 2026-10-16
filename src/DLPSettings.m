@@ -86,39 +86,22 @@ static NSArray *dlp_sectionDataArray(id self, SEL _cmd) {
 
         NSMutableArray *items = [NSMutableArray array];
         id it = nil;
-        it = DLPMakeSwitchItem(kDLPEnabled, @"启用日志探针", @"总开关：关则全部模块卸载", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPModuleClassProbe, @"类名探针", @"后台枚举全量类→classmap.json", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPModuleEventTracer, @"事件追踪", @"页面/网络/播放器/登录/数据落盘", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPModulePerfProbe, @"性能探针", @"FPS/内存/主线程卡顿", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPModuleCrashCatcher, @"崩溃抓捕", @"12信号+未捕获异常", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPModuleBypassCatcher, @"绕过登录捕捉器", @"诊断bypass失效：开关/官方真相/弹窗时间线", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPDetailEnabled, @"细节日志", @"全量默认开：D级与K级同步输出", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPLogToFile, @"落盘日志", @"Documents/DLPLogs/ 按日轮转", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPStderrCapture, @"收其他插件日志", @"stderr重定向：DYYY/DCL/aweJ", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeSwitchItem(kDLPModuleLongPressEntry, @"长按面板入口", @"视频长按菜单加「查看日志」", YES);
-        if (it) [items addObject:it];
-        it = DLPMakeTapItem(@"DLPViewLogs", @"查看实时日志", @"内存2000行，支持搜索", ^{
+        // 总入口：一行「日志探针」，点进去 push 独立设置页（DLPSettingsViewController），
+        // 开关收拢到第二个页面，不再散落原生设置页。
+        it = DLPMakeTapItem(@"DLPMainEntry", @"日志探针", @"总入口", ^{
             UIViewController *top = DLPTopViewController();
-            DLPLogViewController *vc = [[DLPLogViewController alloc] init];
-            UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-            [top presentViewController:nav animated:YES completion:nil];
-        });
-        if (it) [items addObject:it];
-        it = DLPMakeTapItem(@"DLPClassmap", @"类名地图路径", @"classmap.json 导出位置", ^{
-            DLPLog(@"sys", YES, @"DLPSettings", @"classmap", @"path=%@", [DLPClassProbe classmapPath]);
-        });
-        if (it) [items addObject:it];
-        it = DLPMakeTapItem(@"DLPClearLogs", @"清空内存日志", @"不删落盘文件", ^{
-            [DLPLogHub clearLogs];
+            if (!top) { return; }
+            Class vcCls = NSClassFromString(@"DLPSettingsViewController");
+            if (!vcCls) { return; }
+            UIViewController *vc = [[vcCls alloc] initWithStyle:1]; // UITableViewStyleGrouped
+            if ([top isKindOfClass:[UINavigationController class]]) {
+                [(UINavigationController *)top pushViewController:vc animated:YES];
+            } else if (top.navigationController) {
+                [top.navigationController pushViewController:vc animated:YES];
+            } else {
+                UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+                [top presentViewController:nav animated:YES completion:nil];
+            }
         });
         if (it) [items addObject:it];
 

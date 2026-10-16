@@ -156,10 +156,14 @@ static void DLPAnchorPopover(UIViewController *presented, UIViewController *srcV
     }
 }
 
-/// 2. 直达医生设置：dlsym 调 douyin-doctor 的 showDYDSettingsVC，
-/// 对方设置页 push 进当前导航栈，返回键即回日志。
+/// 2. 直达医生设置：dlsym 调 douyin-doctor 的 showDYDOwnSettingsVC，
+/// 进医生自己的设置页（1.1.8+，按 05 配方重做），不再进原生页。
 - (void)dlp_jumpDoctor {
-    void *sym = dlsym(RTLD_DEFAULT, kDLPDoctorSymbol);
+    void *sym = dlsym(RTLD_DEFAULT, "showDYDOwnSettingsVC");
+    if (!sym) {
+        // 回退旧导出（兼容 1.1.7 及更早）
+        sym = dlsym(RTLD_DEFAULT, kDLPDoctorSymbol);
+    }
     if (!sym) {
         UIAlertController *alert =
             [UIAlertController alertControllerWithTitle:@"没探测到"
