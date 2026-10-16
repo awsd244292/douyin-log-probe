@@ -8,7 +8,6 @@
 #import "DLPLogHub.h"
 #import "DLPOrchestrator.h"
 #import "DLPLogViewController.h"
-#import <dlfcn.h>
 
 typedef NS_ENUM(NSInteger, DLPSettingKind) {
     DLPSettingKindSwitch,
@@ -73,24 +72,6 @@ static DLPSettingItem *DLPMakeTap(NSString *title, NSString *sub, void (^tap)(UI
         DLPMakeTap(@"查看实时日志", @"内存2000行，支持搜索", ^(UIViewController *host) {
             DLPLogViewController *vc = [[DLPLogViewController alloc] init];
             [weakSelf.navigationController pushViewController:vc animated:YES];
-        }),
-        DLPMakeTap(@"医生设置", @"进医生自己的设置页", ^(UIViewController *host) {
-            typedef void (*ShowFn)(UIViewController *);
-            ShowFn fn = (ShowFn)dlsym(RTLD_DEFAULT, "showDYDOwnSettingsVC");
-            if (!fn) {
-                UIAlertController *a = [UIAlertController alertControllerWithTitle:@"未找到"
-                                                                           message:@"医生组件未加载"
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-                [a addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
-                [weakSelf presentViewController:a animated:YES completion:nil];
-                return;
-            }
-            @try {
-                fn(weakSelf);
-                DLPLog(@"sys", YES, @"DLPSettingsViewController", @"jumpDoctorOwn", @"ok");
-            } @catch (NSException *e) {
-                DLPLog(@"sys", YES, @"DLPSettingsViewController", @"jumpDoctorOwn", @"fail=%@", e.reason ?: @"?");
-            }
         }),
         DLPMakeTap(@"清空内存日志", @"不删落盘文件", ^(UIViewController *host) {
             [DLPLogHub clearLogs];
