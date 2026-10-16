@@ -6,6 +6,7 @@
 #import "DLPLogViewController.h"
 #import "DLPLogHub.h"
 #import "DLPLogUploader.h"
+#import "DLPDoctorBridge.h"
 #import <dlfcn.h>
 
 // 直达医生设置：douyin-doctor 导出的设置入口 C 函数（DYDSettingsPage.m），
@@ -80,7 +81,12 @@ static void DLPAnchorPopover(UIViewController *presented, UIViewController *srcV
     docBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
     [docBtn addTarget:self action:@selector(dlp_jumpDoctor)
       forControlEvents:UIControlEventTouchUpInside];
-    UIStackView *jumpRow = [[UIStackView alloc] initWithArrangedSubviews:@[backBtn, docBtn]];
+    UIButton *pullBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [pullBtn setTitle:@"📥 拉医生日志" forState:UIControlStateNormal];
+    pullBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [pullBtn addTarget:self action:@selector(dlp_pullDoctorLogs)
+      forControlEvents:UIControlEventTouchUpInside];
+    UIStackView *jumpRow = [[UIStackView alloc] initWithArrangedSubviews:@[backBtn, docBtn, pullBtn]];
     jumpRow.axis = UILayoutConstraintAxisHorizontal;
     jumpRow.distribution = UIStackViewDistributionFillEqually;
     self.jumpRow = jumpRow;
@@ -165,6 +171,33 @@ static void DLPAnchorPopover(UIViewController *presented, UIViewController *srcV
         DLPLog(@"sys", YES, @"DLPLogViewController", @"jumpDoctor", @"fail=%@",
                e.reason ?: @"?");
     }
+}
+
+/// 3. 拉医生日志：直读 douyin-doctor 的 DYDLogManager.allLogs 环形缓冲，
+/// 不依赖 stderr 重定向。拉到的行以 doctor 域注入，可搜索/复制/邮件。
+- (void)dlp_pullDoctorLogs {
+    if (![DLPDoctorBridge doctorPresent]) {
+        UIAlertController *alert =
+            [UIAlertController alertControllerWithTitle:@"没探测到"
+                                               message:@"当前进程里没发现抖音医生（douyin-doctor）"
+                                        preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    NSArray<NSString *> *lines = [DLPDoctorBridge pullDoctorLogs];
+    for (NSString *line in lines) {
+        // 医生行格式：[HH:mm:ss.SSS] 内容 —— 去掉时间戳外壳，原样注入
+        NSString *content = line;
+        NSRange r = [line rangeOfString:@"] "];
+        if (r.location != NSNotFound) {
+            content = [line substringFromIndex:r.location + r.length];
+        }
+        DLPLog(@"doctor", NO, @"DYDLogManager", @"pull", @"%@", content);
+    }
+    DLPLog(@"sys", YES, @"DLPLogViewController", @"pullDoctorLogs", @"ok n=%lu",
+           (unsigned long)lines.count);
+    [self dlp_reload];
 }
 
 /// 上传：二级选单——邮件发送 / 分享面板（可分享进 Muse App）

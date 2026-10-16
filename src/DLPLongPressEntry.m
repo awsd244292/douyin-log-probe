@@ -45,6 +45,7 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
         DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
                @"第%d次触发 self类=%@", callNo, NSStringFromClass([self class]));
     }
+    // 按 self 的实际类找对应的 orig（三类 hook，各调各的 orig，链式共存）
     DLPHookSlot *slot = &s_lpDataArrayModern;
     @try {
         NSString *clsName = NSStringFromClass([self class]);
@@ -57,26 +58,6 @@ static NSArray *dlp_longPressDataArray(id self, SEL _cmd) {
     NSArray *(*orig)(id, SEL) = (NSArray *(*)(id, SEL))slot->orig;
     NSArray *original = orig ? orig(self, _cmd) : @[];
     if (!original) { original = @[]; }
-    // 诊断（1.5.13）：dump 所有组的 groupType + 首 viewModel 描述，定位 DYY 的组
-    if (callNo == 1) {
-        NSMutableArray *info = [NSMutableArray array];
-        for (id g in original) {
-            id gt = nil, arr = nil;
-            @try { gt = [g valueForKey:@"groupType"]; } @catch (NSException *e) {}
-            @try { arr = [g valueForKey:@"groupArr"]; } @catch (NSException *e) {}
-            NSString *desc = @"-";
-            if ([arr isKindOfClass:[NSArray class]] && [(NSArray *)arr count] > 0) {
-                @try { desc = [[(NSArray *)arr firstObject] valueForKey:@"describeString"] ?: @"?"; }
-                @catch (NSException *e) {}
-            }
-            [info addObject:[NSString stringWithFormat:@"t=%@ n=%lu d=%@",
-                gt ?: @"nil",
-                (unsigned long)([arr isKindOfClass:[NSArray class]] ? [(NSArray *)arr count] : 0),
-                desc]];
-        }
-        DLPLog(@"sys", YES, @"DLPLongPressEntry", @"dataArray",
-               @"全组 [%@]", [info componentsJoinedByString:@" | "]);
-    }
     // 开关：默认开，不用可关
     if (!DLPGetBoolDef(kDLPModuleLongPressEntry, YES)) {
         if (callNo <= 3) {
